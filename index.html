@@ -1,0 +1,2492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MLB Matchup Stat Sheet — Best Hitters</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --panel: #161b22;
+    --panel-2: #1c2330;
+    --border: #2d3645;
+    --text: #e6edf3;
+    --muted: #8b97a7;
+    --accent: #f0a830;
+    --accent-2: #6cb6ff;
+    --green: #4ec96f;
+    --red: #ff6b6b;
+    --hot: #ff8c42;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.4;
+    padding: 16px;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+  header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    border-bottom: 2px solid var(--border);
+    padding-bottom: 12px;
+    margin-bottom: 16px;
+  }
+  h1 { font-size: 22px; letter-spacing: -0.3px; }
+  h1 .ball { color: var(--accent); }
+  .updated { font-size: 12px; color: var(--muted); text-align: right; }
+  .updated strong { color: var(--accent-2); }
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 18px;
+  }
+  .controls label { font-size: 13px; color: var(--muted); }
+  input[type="date"], button, select {
+    background: var(--panel-2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 7px 10px;
+    font-size: 13px;
+    font-family: inherit;
+  }
+  button { cursor: pointer; transition: background .15s; }
+  button:hover { background: #283142; }
+  button.primary { background: var(--accent); color: #1a1205; border-color: var(--accent); font-weight: 600; }
+  button.primary:hover { background: #ffbe4d; }
+
+  .tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 18px;
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .tab {
+    background: transparent;
+    border: none;
+    border-bottom: 3px solid transparent;
+    border-radius: 0;
+    color: var(--muted);
+    font-size: 15px;
+    font-weight: 600;
+    padding: 11px 16px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: color .15s, border-color .15s;
+  }
+  .tab:hover { background: rgba(255,255,255,0.03); color: var(--text); }
+  .tab-active { color: var(--accent); border-bottom-color: var(--accent); }
+  .rank-num { color: var(--muted); font-weight: 700; width: 28px; }
+  .lead-table th.sort-on { color: var(--accent); }
+  .lead-th { cursor: pointer; user-select: none; white-space: nowrap; }
+  .lead-th:hover { color: var(--accent-2); }
+  .abbr-key {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 18px;
+    font-size: 11.5px;
+    color: var(--muted);
+  }
+  .abbr-key-title {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    color: var(--accent);
+    font-weight: 700;
+    margin-bottom: 7px;
+  }
+  .abbr-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 3px 16px;
+  }
+  .abbr-grid div { line-height: 1.5; }
+  .abbr-grid b { color: var(--text); font-weight: 700; display: inline-block; min-width: 34px; }
+  .slump-tag {
+    display: inline-block;
+    padding: 1px 7px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  .t-ice   { background: rgba(108,182,255,0.18); color: #6cb6ff; }
+  .t-slump { background: rgba(255,107,107,0.16); color: var(--red); }
+  .t-cool  { background: rgba(240,168,48,0.16); color: var(--accent); }
+  .t-scorch { background: rgba(255,107,107,0.18); color: #ff6b6b; }
+  .t-fire   { background: rgba(255,140,66,0.18); color: var(--hot); }
+  .t-heat   { background: rgba(240,168,48,0.16); color: var(--accent); }
+  .t-deal   { background: rgba(78,201,111,0.22); color: var(--green); }
+  .t-sharp  { background: rgba(78,201,111,0.14); color: var(--green); }
+  .t-steady { background: rgba(108,182,255,0.16); color: var(--accent-2); }
+  .t-shell    { background: rgba(255,107,107,0.22); color: #ff6b6b; }
+  .t-struggle { background: rgba(255,107,107,0.15); color: var(--red); }
+  .t-slip     { background: rgba(240,168,48,0.16); color: var(--accent); }
+  .slump-group-head {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text);
+    padding: 14px 4px 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .slump-count { color: var(--muted); font-weight: 400; font-size: 12px; }
+  .progress-wrap { padding: 30px 20px; text-align: center; color: var(--muted); }
+  .progress-bar-track { background: var(--panel-2); border-radius: 6px; height: 8px; max-width: 320px; margin: 12px auto 0; overflow: hidden; }
+  .progress-bar-fill { background: var(--accent); height: 100%; width: 0%; transition: width .2s; }
+  .pick-score-cell { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
+  .pick-score-num { font-weight: 700; color: var(--accent); min-width: 34px; text-align: right; }
+  .pick-bar-track { background: var(--panel-2); border-radius: 4px; height: 7px; width: 70px; overflow: hidden; flex-shrink: 0; }
+  .pick-bar-fill { background: linear-gradient(90deg, var(--accent-2), var(--accent)); height: 100%; }
+  .pick-rank-medal { font-size: 14px; }
+  .target-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 14px;
+    overflow: hidden;
+  }
+  .target-head {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+    padding: 11px 14px;
+    background: var(--panel-2);
+    border-bottom: 1px solid var(--border);
+  }
+  .target-pitcher { font-size: 16px; font-weight: 700; }
+  .target-vs { color: var(--muted); font-size: 12.5px; }
+  .hit-pill { display:inline-block; padding: 2px 9px; border-radius: 11px; font-size: 11px; font-weight: 700; }
+  .hit-high { background: rgba(255,107,107,0.18); color: #ff6b6b; }
+  .hit-med  { background: rgba(240,168,48,0.16); color: var(--accent); }
+  .hit-low  { background: rgba(78,201,111,0.15); color: var(--green); }
+  .target-statline {
+    display: flex; flex-wrap: wrap; gap: 14px;
+    padding: 9px 14px; font-size: 12.5px;
+    border-bottom: 1px solid var(--border);
+    color: var(--muted);
+  }
+  .target-statline b { color: var(--text); }
+  .target-bats { padding: 9px 14px; }
+  .target-bats-label { font-size: 11px; text-transform: uppercase; letter-spacing: .4px; color: var(--muted); margin-bottom: 6px; }
+  .bat-chip {
+    display: inline-flex; align-items: baseline; gap: 5px;
+    background: var(--panel-2); border: 1px solid var(--border);
+    border-radius: 6px; padding: 3px 9px; margin: 0 6px 6px 0; font-size: 12.5px;
+  }
+  .bat-chip .bname { font-weight: 600; }
+  .bat-chip .bstat { color: var(--muted); font-size: 11px; }
+  .legend {
+    font-size: 11px;
+    color: var(--muted);
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 18px;
+  }
+  .legend b { color: var(--text); }
+
+  .game {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 18px;
+    overflow: hidden;
+  }
+  .game-head {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 14px;
+    background: var(--panel-2);
+    border-bottom: 1px solid var(--border);
+  }
+  .matchup { font-size: 17px; font-weight: 600; }
+  .matchup .at { color: var(--muted); font-weight: 400; margin: 0 6px; }
+  .gtime { font-size: 12px; color: var(--muted); }
+  .pitchers-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    padding: 10px 14px;
+    font-size: 12.5px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(108,182,255,0.04);
+  }
+  .pcard { flex: 1; min-width: 240px; }
+  .pcard .pteam { color: var(--accent-2); font-weight: 600; }
+  .pcard .pname { font-weight: 600; }
+  .pcard .pstat { color: var(--muted); }
+  .pcard .pstat span { color: var(--text); }
+  .rating-pill {
+    display: inline-block;
+    padding: 1px 7px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 700;
+    margin-left: 4px;
+  }
+  .r-tough { background: rgba(78,201,111,0.15); color: var(--green); }
+  .r-avg { background: rgba(240,168,48,0.15); color: var(--accent); }
+  .r-soft { background: rgba(255,107,107,0.15); color: var(--red); }
+
+  .side { padding: 6px 0 12px; }
+  .side-label {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    padding: 8px 14px 4px;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: right; padding: 6px 10px; }
+  th:first-child, td:first-child { text-align: left; }
+  thead th {
+    color: var(--muted);
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .3px;
+    border-bottom: 1px solid var(--border);
+  }
+  tbody tr:nth-child(even) { background: rgba(255,255,255,0.02); }
+  tbody tr:hover { background: rgba(108,182,255,0.06); }
+  .pname-cell { font-weight: 600; }
+  .pos { color: var(--muted); font-size: 11px; font-weight: 400; margin-left: 4px; }
+  .hot-flag {
+    color: var(--hot);
+    font-weight: 700;
+    margin-left: 5px;
+    font-size: 11px;
+  }
+  .hr-badge {
+    display: inline-block;
+    background: rgba(255,140,66,0.16);
+    color: var(--hot);
+    border-radius: 4px;
+    padding: 0 5px;
+    font-weight: 700;
+    font-size: 11px;
+  }
+  .num-strong { color: var(--accent); font-weight: 700; }
+  .kchance { font-weight: 700; white-space: nowrap; }
+  .kproj { font-weight: 400; color: var(--muted); font-size: 11px; }
+  .kc-high { color: var(--red); }
+  .kc-med { color: var(--accent); }
+  .kc-low { color: var(--green); }
+  .kc-na { color: var(--muted); }
+  .kavg { color: var(--accent-2); font-weight: 700; cursor: help; }
+  .kfoot { font-size: 11px; color: var(--muted); padding: 6px 14px 2px; }
+  .empty-side { color: var(--muted); font-size: 12px; padding: 4px 14px 8px; font-style: italic; }
+
+  .status-msg {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--muted);
+    font-size: 15px;
+  }
+  .spinner {
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    width: 28px; height: 28px;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 14px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .err { color: var(--red); }
+  footer {
+    margin-top: 30px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+    font-size: 11px;
+    color: var(--muted);
+    text-align: center;
+  }
+  @media (max-width: 600px) {
+    th, td { padding: 5px 6px; font-size: 12px; }
+    .hide-sm { display: none; }
+    h1 { font-size: 18px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="ball">⚾</span> MLB Stat Sheet</h1>
+  <div class="updated">
+    Data refreshes live on load · <strong id="updatedTime">—</strong>
+  </div>
+</header>
+
+<div class="tabs">
+  <button class="tab tab-active" id="tabMatchups">⚾ Matchups</button>
+  <button class="tab" id="tabPicks">⭐ Top Hitter Picks</button>
+  <button class="tab" id="tabTargets">🎯 Matchup Targets</button>
+  <button class="tab" id="tabLeaders">🔥 Top Hitters</button>
+  <button class="tab" id="tabTopPitchers">💪 Top Pitchers</button>
+  <button class="tab" id="tabWorstPitchers">🎯 Worst Pitchers</button>
+  <button class="tab" id="tabHot">🔥 Overperformers</button>
+  <button class="tab" id="tabSlumps">🧊 Underperformers</button>
+  <button class="tab" id="tabHeatPitch">🚀 Heating Pitchers</button>
+  <button class="tab" id="tabCoolPitch">🥶 Cooling Pitchers</button>
+</div>
+
+<!-- ===================== MATCHUPS VIEW ===================== -->
+<div id="view-matchups">
+<div class="controls">
+  <label for="datePick">Game day:</label>
+  <input type="date" id="datePick">
+  <button class="primary" id="loadBtn">Load Slate</button>
+  <button id="todayBtn">Today</button>
+  <button id="tmrwBtn">Tomorrow</button>
+</div>
+
+<div class="legend">
+  <b>How to read this:</b> Each game lists the probable starting pitchers with a
+  <b>rating</b> from their ERA + WHIP (<span style="color:var(--green)">Tough</span>,
+  <span style="color:var(--accent)">Average</span>, <span style="color:var(--red)">Soft</span>) plus their
+  <b>K%</b> (strikeout rate). Below, each team's <b>top 6 hitters</b> are ranked by a blend of season
+  OPS and <b>recent form</b> (last 15 days). Columns: <b>SO</b> = season strikeouts, <b>K%</b> = the
+  hitter's own strikeout rate, and <b>K&nbsp;Chance</b> = estimated strikeout chance <i>against that game's
+  opposing starter</i>, shown as % per plate appearance with projected total Ks in parentheses.
+  K&nbsp;Chance colors: <span style="color:var(--red)">high</span> /
+  <span style="color:var(--accent)">medium</span> / <span style="color:var(--green)">low</span>.
+  A <span class="hot-flag">HOT</span> flag means batting .300+ over the last 15 days. When no starter is
+  posted yet, K&nbsp;Chance is estimated vs a league-average pitcher and marked with <span class="kavg">*</span>.
+  <br><span style="color:var(--muted)">K Chance uses the standard matchup formula: (batter K% × pitcher K%) ÷ league&nbsp;K% (~22%). It's an estimate, not a guarantee.</span>
+</div>
+
+<div class="abbr-key">
+  <div class="abbr-key-title">Abbreviations</div>
+  <div class="abbr-grid">
+    <div><b>AVG</b> Batting average</div>
+    <div><b>OPS</b> On-base + slugging</div>
+    <div><b>SO</b> Strikeouts (season)</div>
+    <div><b>K%</b> Strikeout rate (SO ÷ PA)</div>
+    <div><b>K Chance</b> Est. strikeout chance vs. opposing starter</div>
+    <div><b>HR 15d</b> Home runs, last 15 days</div>
+    <div><b>SP</b> Starting pitcher</div>
+    <div><b>ERA</b> Earned run average</div>
+    <div><b>WHIP</b> Walks + hits per inning</div>
+    <div><b>K/9</b> Strikeouts per 9 innings</div>
+    <div><b>HOT</b> Batting .300+ over last 15 days</div>
+    <div><b>PA</b> Plate appearances</div>
+  </div>
+</div>
+
+<div id="content">
+  <div class="status-msg"><div class="spinner"></div>Loading today's slate…</div>
+</div>
+</div><!-- /view-matchups -->
+
+<!-- ===================== TOP HITTER PICKS VIEW ===================== -->
+<div id="view-picks" style="display:none;">
+  <div class="controls">
+    <label for="picksDate">Game day:</label>
+    <input type="date" id="picksDate">
+    <select id="pickType">
+      <option value="balanced">Balanced pick</option>
+      <option value="power">Power pick (HR)</option>
+      <option value="contact">Contact pick (AVG)</option>
+    </select>
+    <select id="picksCount">
+      <option value="10">Top 10 picks</option>
+      <option value="15" selected>Top 15 picks</option>
+      <option value="20">Top 20 picks</option>
+    </select>
+    <button class="primary" id="picksBtn">Get Picks</button>
+  </div>
+  <div class="legend">
+    <b>Today's Top Hitter Picks</b> — the best proven bats in the lineups playing on the selected day, ranked
+    by a career résumé score. Choose a <b>pick type</b>: <b>Balanced</b> (AVG 40% + hits 30% + HR 30%),
+    <b>Power</b> (weighted to home runs and HR-per-AB rate), or <b>Contact</b> (weighted to batting average).
+    Each component is measured against MLB benchmarks (.300 AVG, 2000 H, 300 HR, ~.05 HR/AB) so they combine
+    on one scale. A <b>250+ career at-bat minimum</b> keeps it to established hitters rather than small-sample
+    flukes. Season AVG is shown alongside career AVG so you can see who's in form now versus living on résumé.
+    <br><span style="color:var(--muted)">This is a career-based ranking, not a matchup play. For situational edge, use the Matchup Targets tab — a top pick facing a vulnerable pitcher is the board's best spot.</span>
+  </div>
+  <div class="abbr-key">
+    <div class="abbr-key-title">Abbreviations</div>
+    <div class="abbr-grid">
+      <div><b>AB</b> Career at-bats</div>
+      <div><b>H</b> Career hits</div>
+      <div><b>HR</b> Career home runs</div>
+      <div><b>AVG</b> Career batting average (H÷AB)</div>
+      <div><b>HR/AB</b> Career home runs per at-bat</div>
+      <div><b>SznAVG</b> This season's average</div>
+      <div><b>Pick Score</b> Career composite (varies by pick type)</div>
+    </div>
+  </div>
+  <div id="picksContent">
+    <div class="status-msg">Pick a day and click <b>Get Picks</b> for today's top hitters.</div>
+  </div>
+</div>
+
+<!-- ===================== MATCHUP TARGETS VIEW ===================== -->
+<div id="view-targets" style="display:none;">
+  <div class="controls">
+    <label for="targetsDate">Game day:</label>
+    <input type="date" id="targetsDate">
+    <select id="targetsWindow">
+      <option value="season">This season</option>
+      <option value="10">Last 10 games</option>
+      <option value="5">Last 5 games</option>
+      <option value="3">Last 3 games</option>
+    </select>
+    <button class="primary" id="targetsBtn">Find Targets</button>
+  </div>
+  <div class="legend">
+    <b>Matchup Targets</b> finds the <b>most hittable starting pitchers</b> on the selected day and shows the
+    batters who get to face them. For each game's probable starters it builds a <b>Hittability</b> rating from
+    the vulnerabilities you'd want to attack: a <b>low strikeout rate</b> (can't miss bats) plus <b>high WHIP,
+    hits/9, and HR/9</b> (gives up a ton of bases). Pick the window — <b>season, last 10, 5, or 3 games</b> —
+    to judge a pitcher on their body of work or their recent form. Pitchers are ranked
+    <span class="slump-tag t-shell">most hittable first</span>, each paired with the opposing lineup's top
+    bats by season OPS. A strong hitter facing a high-hittability arm is the board's best spot.
+    <br><span style="color:var(--muted)">Needs probable pitchers posted (usually a day or two out). Pitch velocity isn't in the free API, so "soft-tosser who gives up bases" is captured statistically via low K rate + high hits/WHIP. Pulls game logs for each starter, so it takes a few seconds.</span>
+  </div>
+  <div class="abbr-key">
+    <div class="abbr-key-title">Abbreviations</div>
+    <div class="abbr-grid">
+      <div><b>Hittability</b> How vulnerable the pitcher is (higher = better target)</div>
+      <div><b>IP</b> Innings pitched (selected window)</div>
+      <div><b>K/9</b> Strikeouts per 9 — low = vulnerable</div>
+      <div><b>WHIP</b> Walks + hits per inning — high = vulnerable</div>
+      <div><b>H/9</b> Hits allowed per 9 — high = vulnerable</div>
+      <div><b>HR/9</b> Home runs per 9 — high = vulnerable</div>
+      <div><b>ERA</b> Earned run average (window)</div>
+      <div><b>Bats facing</b> Opposing lineup's top hitters by season OPS</div>
+    </div>
+  </div>
+  <div id="targetsContent">
+    <div class="status-msg">Pick a day and click <b>Find Targets</b> to scout vulnerable pitchers.</div>
+  </div>
+</div>
+
+<!-- ===================== LEADERBOARD VIEW ===================== -->
+<div id="view-leaders" style="display:none;">
+  <div class="controls">
+    <label for="sortPick">Quick sort:</label>
+    <select id="sortPick">
+      <option value="ops">OPS (overall best)</option>
+      <option value="avg">Batting Average</option>
+      <option value="hits">Hits</option>
+      <option value="homeRuns">Home Runs</option>
+      <option value="rbi">RBI</option>
+      <option value="runs">Runs</option>
+      <option value="doubles">Doubles</option>
+      <option value="triples">Triples</option>
+      <option value="baseOnBalls">Walks</option>
+      <option value="stolenBases">Stolen Bases</option>
+      <option value="strikeOuts">Strikeouts (most)</option>
+      <option value="krateLow">Best Contact (lowest K%)</option>
+    </select>
+    <button class="primary" id="leadersBtn">Refresh</button>
+  </div>
+  <div class="legend">
+    The top 75 qualified MLB hitters this season. <b>Click any column header to sort</b> by that stat —
+    click again to reverse the order. The dropdown is a quick shortcut for the common ones.
+    <b>Qualified</b> means enough plate appearances to be official. Columns: AVG, OBP, SLG, OPS, hits (H),
+    doubles (2B), triples (3B), HR, RBI, runs (R), walks (BB), stolen bases (SB), strikeouts (SO), and K%.
+  </div>
+  <div class="abbr-key">
+    <div class="abbr-key-title">Abbreviations</div>
+    <div class="abbr-grid">
+      <div><b>AVG</b> Batting average</div>
+      <div><b>OBP</b> On-base percentage</div>
+      <div><b>SLG</b> Slugging percentage</div>
+      <div><b>OPS</b> On-base + slugging</div>
+      <div><b>H</b> Hits</div>
+      <div><b>2B</b> Doubles</div>
+      <div><b>3B</b> Triples</div>
+      <div><b>HR</b> Home runs</div>
+      <div><b>RBI</b> Runs batted in</div>
+      <div><b>R</b> Runs scored</div>
+      <div><b>BB</b> Walks (bases on balls)</div>
+      <div><b>SB</b> Stolen bases</div>
+      <div><b>SO</b> Strikeouts</div>
+      <div><b>K%</b> Strikeout rate (SO ÷ PA)</div>
+    </div>
+  </div>
+  <div id="leadersContent">
+    <div class="status-msg"><div class="spinner"></div>Loading leaderboard…</div>
+  </div>
+</div>
+
+<!-- ===================== TOP PITCHERS VIEW ===================== -->
+<div id="view-toppitchers" style="display:none;">
+  <div class="controls">
+    <label for="topPitchSort">Quick sort:</label>
+    <select id="topPitchSort">
+      <option value="era">ERA (lowest)</option>
+      <option value="whip">WHIP (lowest)</option>
+      <option value="strikeoutsPer9Inn">K/9 (highest)</option>
+      <option value="kRate">K% (highest)</option>
+      <option value="wins">Wins</option>
+      <option value="strikeOuts">Strikeouts</option>
+      <option value="inningsPitched">Innings Pitched</option>
+    </select>
+    <button class="primary" id="topPitchBtn">Refresh</button>
+  </div>
+  <div class="legend">
+    The top 75 qualified MLB pitchers this season, sorted by ERA by default (best run-prevention first).
+    <b>Click any column header to sort.</b> Columns: Wins-Losses (W-L), ERA, WHIP, innings pitched (IP),
+    strikeouts (SO), K/9, walks (BB), and K%. Lower ERA and WHIP are better; higher K/9 and K% mean more
+    swing-and-miss stuff.
+  </div>
+  <div class="abbr-key">
+    <div class="abbr-key-title">Abbreviations</div>
+    <div class="abbr-grid">
+      <div><b>W-L</b> Wins–Losses</div>
+      <div><b>ERA</b> Earned run average</div>
+      <div><b>WHIP</b> Walks + hits per inning</div>
+      <div><b>IP</b> Innings pitched</div>
+      <div><b>SO</b> Strikeouts</div>
+      <div><b>K/9</b> Strikeouts per 9 innings</div>
+      <div><b>BB</b> Walks allowed</div>
+      <div><b>HR</b> Home runs allowed</div>
+      <div><b>ER</b> Earned runs allowed</div>
+      <div><b>K%</b> Strikeout rate (SO ÷ batters faced)</div>
+    </div>
+  </div>
+  <div id="topPitchContent">
+    <div class="status-msg"><div class="spinner"></div>Loading pitchers…</div>
+  </div>
+</div>
+
+<!-- ===================== WORST PITCHERS VIEW ===================== -->
+<div id="view-worstpitchers" style="display:none;">
+  <div class="controls">
+    <label for="worstPitchSort">Quick sort:</label>
+    <select id="worstPitchSort">
+      <option value="era">ERA (highest)</option>
+      <option value="whip">WHIP (highest)</option>
+      <option value="homeRuns">HR allowed (most)</option>
+      <option value="baseOnBalls">Walks (most)</option>
+      <option value="earnedRuns">Earned runs (most)</option>
+      <option value="losses">Losses</option>
+    </select>
+    <button class="primary" id="worstPitchBtn">Refresh</button>
+  </div>
+  <div class="legend">
+    The 75 qualified MLB pitchers struggling most this season, sorted by ERA by default (worst
+    run-prevention first). <b>Click any column header to sort.</b> These are the arms opposing hitters
+    feast on — useful alongside the Matchups tab when a hittable starter is on the mound. Higher ERA,
+    WHIP, HR, and walks are all <i>worse</i> for the pitcher.
+  </div>
+  <div class="abbr-key">
+    <div class="abbr-key-title">Abbreviations</div>
+    <div class="abbr-grid">
+      <div><b>W-L</b> Wins–Losses</div>
+      <div><b>ERA</b> Earned run average</div>
+      <div><b>WHIP</b> Walks + hits per inning</div>
+      <div><b>IP</b> Innings pitched</div>
+      <div><b>SO</b> Strikeouts</div>
+      <div><b>K/9</b> Strikeouts per 9 innings</div>
+      <div><b>BB</b> Walks allowed</div>
+      <div><b>HR</b> Home runs allowed</div>
+      <div><b>ER</b> Earned runs allowed</div>
+      <div><b>K%</b> Strikeout rate (SO ÷ batters faced)</div>
+    </div>
+  </div>
+  <div id="worstPitchContent">
+    <div class="status-msg"><div class="spinner"></div>Loading pitchers…</div>
+  </div>
+</div>
+
+<!-- ===================== OVERPERFORMERS VIEW ===================== -->
+<div id="view-hot" style="display:none;">
+  <div class="controls">
+    <label for="hotDate">Game day:</label>
+    <input type="date" id="hotDate">
+    <select id="hotWindow">
+      <option value="1">Last game</option>
+      <option value="3">Last 3 games</option>
+      <option value="5">Last 5 games</option>
+      <option value="10">Last 10 games</option>
+    </select>
+    <select id="hotSort">
+      <option value="avg3">Hottest (highest AVG)</option>
+      <option value="hr3">Most HR</option>
+      <option value="ab3">Most at-bats</option>
+    </select>
+    <button class="primary" id="hotBtn">Analyze Slate</button>
+  </div>
+  <div class="legend">
+    Hitters who are <b>locked in over their recent games</b>, drawn from the lineups playing on the selected
+    day. Choose a <b>3-, 5-, or 10-game window</b>; this pulls each batter's game logs and shows at-bats (AB),
+    hits (H), and home runs (HR) over that window, plus the resulting average. A minimum number of at-bats
+    (scaled to the window) is required, so this reflects regulars genuinely on a heater. They're bucketed:
+    <span class="slump-tag t-scorch">SCORCHING</span> (.400+ or 2+ HR),
+    <span class="slump-tag t-fire">ON FIRE</span> (.350–.400),
+    <span class="slump-tag t-heat">HEATING UP</span> (.300–.350).
+    Pair these with the <b>Cooling Pitchers</b> tab — a hot bat facing a hittable arm is your strongest play.
+    <br><span style="color:var(--muted)">This pulls game logs for every hitter in the slate, so it takes a few seconds. Each window is cached, and the same window is shared with Underperformers for the same day.</span>
+  </div>
+  <div class="abbr-key">
+    <div class="abbr-key-title">Abbreviations</div>
+    <div class="abbr-grid">
+      <div><b>AB</b> At-bats (selected window)</div>
+      <div><b>H</b> Hits (selected window)</div>
+      <div><b>HR</b> Home runs (selected window)</div>
+      <div><b>N-Game AVG</b> Hits ÷ at-bats over the window</div>
+      <div><b>SCORCHING</b> .400+ or 2+ HR in the window</div>
+      <div><b>ON FIRE</b> Average .350–.400</div>
+      <div><b>HEATING UP</b> Average .300–.350</div>
+      <div><b>SznAVG</b> Season average (for contrast)</div>
+    </div>
+  </div>
+  <div id="hotContent">
+    <div class="status-msg">Pick a day and click <b>Analyze Slate</b> to find hot hitters.</div>
+  </div>
+</div>
+
+<!-- ===================== UNDERPERFORMERS VIEW ===================== -->
+<div id="view-slumps" style="display:none;">
+  <div class="controls">
+    <label for="slumpDate">Game day:</label>
+    <input type="date" id="slumpDate">
+    <select id="slumpWindow">
+      <option value="1">Last game</option>
+      <option value="3">Last 3 games</option>
+      <option value="5">Last 5 games</option>
+      <option value="10">Last 10 games</option>
+    </select>
+    <select id="slumpSort">
+      <option value="avg3">Coldest (lowest AVG)</option>
+      <option value="ab3">Most at-bats wasted</option>
+      <option value="hr3">Fewest HR</option>
+    </select>
+    <button class="primary" id="slumpBtn">Analyze Slate</button>
+  </div>
+  <div class="legend">
+    Hitters who are <b>cold over their recent games</b>, drawn from the lineups playing on the selected day.
+    Choose a <b>3-, 5-, or 10-game window</b>; this pulls each batter's game logs and shows at-bats (AB),
+    hits (H), and home runs (HR) over that window, plus the resulting average. A minimum number of at-bats
+    (scaled to the window) is required, so this reflects regulars in a real slump rather than bench players.
+    They're bucketed:
+    <span class="slump-tag t-ice">ICE COLD</span> (0 hits),
+    <span class="slump-tag t-slump">SLUMPING</span> (under .150),
+    <span class="slump-tag t-cool">COOLING</span> (.150–.220).
+    <br><span style="color:var(--muted)">This pulls game logs for every hitter in the slate, so it takes a few seconds. Each window is cached, and the same window is shared with Overperformers for the same day.</span>
+  </div>
+  <div class="abbr-key">
+    <div class="abbr-key-title">Abbreviations</div>
+    <div class="abbr-grid">
+      <div><b>AB</b> At-bats (selected window)</div>
+      <div><b>H</b> Hits (selected window)</div>
+      <div><b>HR</b> Home runs (selected window)</div>
+      <div><b>N-Game AVG</b> Hits ÷ at-bats over the window</div>
+      <div><b>ICE COLD</b> 0 hits in the window</div>
+      <div><b>SLUMPING</b> Average under .150</div>
+      <div><b>COOLING</b> Average .150–.220</div>
+      <div><b>SznAVG</b> Season average (for contrast)</div>
+    </div>
+  </div>
+  <div id="slumpContent">
+    <div class="status-msg">Pick a day and click <b>Analyze Slate</b> to find cold hitters.</div>
+  </div>
+</div>
+
+<!-- ===================== HEATING PITCHERS VIEW ===================== -->
+<div id="view-heatpitch" style="display:none;">
+  <div class="controls">
+    <label for="heatPitchDate">Game day:</label>
+    <input type="date" id="heatPitchDate">
+    <select id="heatPitchWindow">
+      <option value="1">Last game</option>
+      <option value="3">Last 3 games</option>
+      <option value="5">Last 5 games</option>
+      <option value="10">Last 10 games</option>
+    </select>
+    <select id="heatPitchSort">
+      <option value="era3">Best recent ERA</option>
+      <option value="k">Most strikeouts</option>
+      <option value="k9">Highest K/9</option>
+      <option value="whip3">Lowest WHIP</option>
+      <option value="kbb">Best K/BB</option>
+    </select>
+    <button class="primary" id="heatPitchBtn">Analyze Slate</button>
+  </div>
+  <div class="legend">
+    Pitchers <b>locked in over their recent appearances</b>, from the staffs of teams playing the selected
+    day. Choose a <b>3-, 5-, or 10-appearance window</b>. Strikeouts (K, K/9) and limiting baserunners
+    (H, BB, WHIP) are front and center. A minimum innings total (scaled to the window) is required. Bucketed
+    by recent ERA:
+    <span class="slump-tag t-deal">DEALING</span> (sub-1.50),
+    <span class="slump-tag t-sharp">SHARP</span> (1.50–3.00),
+    <span class="slump-tag t-steady">STEADY</span> (3.00–3.75).
+    Pair with the <b>Overperformers</b> tab — a hot pitcher facing cold bats is a strong lean.
+    <br><span style="color:var(--muted)">"Appearances" = games pitched, not innings — IP is shown separately for sample-size context (relievers cover fewer innings). Each window is cached and shared with Cooling Pitchers for the same day.</span>
+  </div>
+  <div class="abbr-key">
+    <div class="abbr-key-title">Abbreviations</div>
+    <div class="abbr-grid">
+      <div><b>IP</b> Innings pitched (last 3 apps)</div>
+      <div><b>H</b> Hits allowed</div>
+      <div><b>BB</b> Walks allowed</div>
+      <div><b>K</b> Strikeouts</div>
+      <div><b>HR</b> Home runs allowed</div>
+      <div><b>WHIP</b> Walks + hits per inning</div>
+      <div><b>K/9</b> Strikeouts per 9 innings</div>
+      <div><b>K/BB</b> Strikeout-to-walk ratio</div>
+      <div><b>ERA</b> Earned run average (window)</div>
+      <div><b>SznERA</b> Season ERA (for contrast)</div>
+      <div><b>DEALING</b> Sub-1.50 recent ERA</div>
+      <div><b>SHARP</b> 1.50–3.00 recent ERA</div>
+    </div>
+  </div>
+  <div id="heatPitchContent">
+    <div class="status-msg">Pick a day and click <b>Analyze Slate</b> to find hot pitchers.</div>
+  </div>
+</div>
+
+<!-- ===================== COOLING PITCHERS VIEW ===================== -->
+<div id="view-coolpitch" style="display:none;">
+  <div class="controls">
+    <label for="coolPitchDate">Game day:</label>
+    <input type="date" id="coolPitchDate">
+    <select id="coolPitchWindow">
+      <option value="1">Last game</option>
+      <option value="3">Last 3 games</option>
+      <option value="5">Last 5 games</option>
+      <option value="10">Last 10 games</option>
+    </select>
+    <select id="coolPitchSort">
+      <option value="era3">Worst recent ERA</option>
+      <option value="h">Most hits allowed</option>
+      <option value="br">Most baserunners (H+BB)</option>
+      <option value="hr">Most HR allowed</option>
+      <option value="k">Fewest strikeouts</option>
+    </select>
+    <button class="primary" id="coolPitchBtn">Analyze Slate</button>
+  </div>
+  <div class="legend">
+    Pitchers <b>getting hit hard over their recent appearances</b>, from the staffs of teams playing the
+    selected day. Choose a <b>3-, 5-, or 10-appearance window</b>. Shows how many hits and baserunners
+    they're allowing (H, BB, WHIP), the long balls (HR), and how few they're striking out (K, K/9). A
+    minimum innings total (scaled to the window) is required. Bucketed by recent ERA:
+    <span class="slump-tag t-shell">GETTING SHELLED</span> (7.00+),
+    <span class="slump-tag t-struggle">STRUGGLING</span> (5.50–7.00),
+    <span class="slump-tag t-slip">SLIPPING</span> (4.50–5.50).
+    Pair with the <b>Overperformers</b> tab — hot bats facing one of these arms is the board's strongest play.
+    <br><span style="color:var(--muted)">"Appearances" = games pitched, not innings — IP is shown separately for context. Each window is cached and shared with Heating Pitchers for the same day.</span>
+  </div>
+  <div class="abbr-key">
+    <div class="abbr-key-title">Abbreviations</div>
+    <div class="abbr-grid">
+      <div><b>IP</b> Innings pitched (last 3 apps)</div>
+      <div><b>H</b> Hits allowed</div>
+      <div><b>BB</b> Walks allowed</div>
+      <div><b>K</b> Strikeouts</div>
+      <div><b>HR</b> Home runs allowed</div>
+      <div><b>WHIP</b> Walks + hits per inning</div>
+      <div><b>K/9</b> Strikeouts per 9 innings</div>
+      <div><b>ERA</b> Earned run average (window)</div>
+      <div><b>SznERA</b> Season ERA (for contrast)</div>
+      <div><b>SHELLED</b> 7.00+ recent ERA</div>
+      <div><b>STRUGGLING</b> 5.50–7.00 recent ERA</div>
+      <div><b>SLIPPING</b> 4.50–5.50 recent ERA</div>
+    </div>
+  </div>
+  <div id="coolPitchContent">
+    <div class="status-msg">Pick a day and click <b>Analyze Slate</b> to find cold pitchers.</div>
+  </div>
+</div>
+
+<footer>
+  Source: MLB Stats API (statsapi.mlb.com) — free public feed, no key required.<br>
+  Pitcher rating and hitter ranking are computed locally from official stats. Not affiliated with MLB.
+</footer>
+
+<script>
+const API = "https://statsapi.mlb.com/api/v1";
+const contentEl = document.getElementById("content");
+const updatedEl = document.getElementById("updatedTime");
+
+// ---------- date helpers (Eastern-aware-ish: uses local, label shows ET note) ----------
+function ymd(d) {
+  return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+}
+function daysAgo(n) { const d = new Date(); d.setDate(d.getDate()-n); return ymd(d); }
+
+// ---------- league baselines & strikeout math ----------
+// MLB league-average strikeout rate has held near 22% of plate appearances in recent seasons.
+// Used as the neutral anchor in the matchup odds-ratio formula below.
+const LEAGUE_K_RATE = 0.22;
+const EXPECTED_PA_PER_GAME = 4.1; // typical PA for a lineup regular in a 9-inning game
+
+// Per-game store so the hitter tables (which face the OPPOSING pitcher) can read that
+// pitcher's K-rate once it loads. Keyed by gamePk -> { home:{kRate,name}, away:{...} }.
+const pitcherStore = {};
+
+// Batter strikeout rate = strikeouts / plate appearances.
+function batterKRate(strikeOuts, plateAppearances) {
+  const pa = parseFloat(plateAppearances) || 0;
+  if (pa < 1) return null;
+  return (parseFloat(strikeOuts) || 0) / pa;
+}
+
+// Pitcher strikeout rate = strikeouts / batters faced.
+function pitcherKRate(strikeOuts, battersFaced) {
+  const bf = parseFloat(battersFaced) || 0;
+  if (bf < 1) return null;
+  return (parseFloat(strikeOuts) || 0) / bf;
+}
+
+// Matchup strikeout probability per plate appearance (odds-ratio / "log5"-style method):
+//   p(K) = (batterK% * pitcherK%) / leagueK%
+// Reflects that two K-prone players produce more strikeouts, either contact-strong one fewer.
+function matchupKProb(batterK, pitcherK) {
+  if (batterK == null || pitcherK == null) return null;
+  let p = (batterK * pitcherK) / LEAGUE_K_RATE;
+  // clamp to a sane range; a single-PA K prob realistically tops out well under 0.75
+  if (p > 0.75) p = 0.75;
+  if (p < 0.02) p = 0.02;
+  return p;
+}
+
+function kChanceClass(prob) {
+  if (prob == null) return "kc-na";
+  if (prob >= 0.32) return "kc-high";   // very likely to strike out at least once / high per-PA risk
+  if (prob >= 0.24) return "kc-med";
+  return "kc-low";
+}
+
+// ---------- pitcher rating from ERA + WHIP ----------
+function ratePitcher(era, whip) {
+  // lower is better. Compose a 0-100 "hittability" score; we display tough/avg/soft.
+  if (era == null || whip == null) return {label:"—", cls:"r-avg", score:null};
+  const e = parseFloat(era), w = parseFloat(whip);
+  if (isNaN(e) || isNaN(w)) return {label:"—", cls:"r-avg", score:null};
+  // tough if era<3.3 and whip<1.15; soft if era>4.6 or whip>1.40
+  const score = e + (w*3); // rough combined index
+  if (e < 3.30 && w < 1.18) return {label:"Tough", cls:"r-tough", score};
+  if (e > 4.60 || w > 1.42) return {label:"Soft", cls:"r-soft", score};
+  return {label:"Average", cls:"r-avg", score};
+}
+
+// All API calls flow through here. On desktop browsers (and when hosted) the direct request
+// works. But when this file is opened straight from the iPhone Files app, the page has a
+// "null" origin and iOS Safari blocks the cross-origin request to MLB. In that case we
+// transparently retry through one of several read-only CORS proxies until one succeeds.
+// This changes ONLY how the raw JSON is fetched — never how it's parsed or calculated.
+//
+// Each proxy entry: build(url) -> proxied URL, and wrapped:true if the proxy returns the
+// upstream body wrapped inside a JSON envelope (we unwrap it) vs raw passthrough.
+const _proxies = [
+  { build: (u) => "https://corsproxy.io/?url=" + encodeURIComponent(u), wrapped: false },
+  { build: (u) => "https://api.allorigins.win/raw?url=" + encodeURIComponent(u), wrapped: false },
+  { build: (u) => "https://api.allorigins.win/get?url=" + encodeURIComponent(u), wrapped: true },
+  { build: (u) => "https://thingproxy.freeboard.io/fetch/" + u, wrapped: false },
+];
+let _proxyIdx = -1; // -1 = direct works; >=0 = index of the proxy that succeeded
+
+// fetch with a timeout so a dead/slow proxy can't hang the spinner forever
+async function _fetchTimeout(u, ms) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms);
+  try { return await fetch(u, { signal: ctrl.signal }); }
+  finally { clearTimeout(t); }
+}
+
+async function _viaProxy(p, url) {
+  const r = await _fetchTimeout(p.build(url), 10000);
+  if (!r.ok) throw new Error("HTTP " + r.status);
+  if (p.wrapped) {
+    const env = await r.json();          // allorigins /get returns { contents: "<json string>" }
+    return JSON.parse(env.contents);
+  }
+  return r.json();
+}
+
+async function getJSON(url) {
+  // If a proxy already worked this session, use it directly.
+  if (_proxyIdx >= 0) {
+    try { return await _viaProxy(_proxies[_proxyIdx], url); }
+    catch (e) { /* that proxy died mid-session; fall through to re-discover below */ _proxyIdx = -2; }
+  }
+  // Try the direct request first (unless we already know it's blocked).
+  if (_proxyIdx === -1) {
+    try {
+      const r = await _fetchTimeout(url, 10000);
+      if (!r.ok) throw new Error("HTTP " + r.status + " on " + url);
+      return await r.json();
+    } catch (e) { /* blocked or offline — fall through to proxies */ }
+  }
+  // Walk the proxy list until one works; remember it.
+  for (let i = 0; i < _proxies.length; i++) {
+    try {
+      const data = await _viaProxy(_proxies[i], url);
+      _proxyIdx = i;
+      return data;
+    } catch (e) { /* try next proxy */ }
+  }
+  throw new Error("All network paths failed (direct + " + _proxies.length + " proxies). On iPhone, hosting the file over https fixes this permanently — see the note from Claude.");
+}
+
+// ---------- main load ----------
+async function loadSlate(dateStr) {
+  contentEl.innerHTML = '<div class="status-msg"><div class="spinner"></div>Loading slate for ' + dateStr + '…</div>';
+  try {
+    // schedule with probable pitchers
+    const sched = await getJSON(`${API}/schedule?sportId=1&date=${dateStr}&hydrate=probablePitcher,team`);
+    const dates = sched.dates || [];
+    if (!dates.length || !dates[0].games || !dates[0].games.length) {
+      contentEl.innerHTML = '<div class="status-msg">No MLB games scheduled for <strong>' + dateStr + '</strong>. Try another date.</div>';
+      stampTime();
+      return;
+    }
+    const games = dates[0].games;
+
+    // Render shell with placeholders, then fill each game's hitters async
+    contentEl.innerHTML = "";
+    for (const g of games) {
+      const node = renderGameShell(g);
+      contentEl.appendChild(node);
+    }
+    stampTime();
+
+    // Fill hitters per team (sequential to be gentle on the API)
+    for (const g of games) {
+      const home = g.teams.home.team;
+      const away = g.teams.away.team;
+      await fillTeamHitters(g.gamePk, away.id, away.abbreviation || away.name, "away");
+      await fillTeamHitters(g.gamePk, home.id, home.abbreviation || home.name, "home");
+    }
+  } catch (e) {
+    contentEl.innerHTML = '<div class="status-msg err">Could not load data: ' + e.message +
+      '<br><br>This usually means the network blocked statsapi.mlb.com. Try reloading.</div>';
+  }
+}
+
+function teamName(t) { return t.abbreviation || t.teamName || t.name; }
+
+function renderGameShell(g) {
+  const home = g.teams.home.team;
+  const away = g.teams.away.team;
+  const hp = g.teams.home.probablePitcher;
+  const ap = g.teams.away.probablePitcher;
+
+  const gtime = g.gameDate ? new Date(g.gameDate).toLocaleTimeString([], {hour:'numeric', minute:'2-digit'}) : "TBD";
+
+  const div = document.createElement("div");
+  div.className = "game";
+  div.dataset.gamepk = g.gamePk;
+
+  div.innerHTML = `
+    <div class="game-head">
+      <div class="matchup">${teamName(away)} <span class="at">@</span> ${teamName(home)}</div>
+      <div class="gtime">${gtime} · ${g.status?.detailedState || ""}</div>
+    </div>
+    <div class="pitchers-row">
+      <div class="pcard" id="pit-${g.gamePk}-away"><span class="pteam">${teamName(away)} SP</span><br>Loading probable…</div>
+      <div class="pcard" id="pit-${g.gamePk}-home"><span class="pteam">${teamName(home)} SP</span><br>Loading probable…</div>
+    </div>
+    <div class="side">
+      <div class="side-label">${teamName(away)} — Top Hitters</div>
+      <div id="bat-${g.gamePk}-away"><div class="empty-side">loading hitters…</div></div>
+    </div>
+    <div class="side">
+      <div class="side-label">${teamName(home)} — Top Hitters</div>
+      <div id="bat-${g.gamePk}-home"><div class="empty-side">loading hitters…</div></div>
+    </div>
+  `;
+
+  // fire pitcher fills (don't await; parallel ok, only 2 per game)
+  fillPitcher(g.gamePk, "away", ap);
+  fillPitcher(g.gamePk, "home", hp);
+  return div;
+}
+
+async function fillPitcher(gamePk, side, p) {
+  const el = document.getElementById(`pit-${gamePk}-${side}`);
+  if (!el) return;
+  if (!p) {
+    el.innerHTML = el.innerHTML.replace("Loading probable…", "<span class='pname'>TBD</span>");
+    // record null so hitter tables don't wait forever
+    pitcherStore[gamePk] = pitcherStore[gamePk] || {};
+    pitcherStore[gamePk][side] = { kRate: null, name: "TBD" };
+    refreshOpposingHitters(gamePk, side);
+    return;
+  }
+  try {
+    const data = await getJSON(`${API}/people/${p.id}?hydrate=stats(group=[pitching],type=[season])`);
+    const person = data.people[0];
+    const splits = person.stats?.[0]?.splits?.[0]?.stat || {};
+    const era = splits.era, whip = splits.whip, w = splits.wins, l = splits.losses,
+          k9 = splits.strikeoutsPer9Inn, so = splits.strikeOuts, ip = splits.inningsPitched,
+          bf = splits.battersFaced;
+    const rt = ratePitcher(era, whip);
+
+    // Primary: K% = SO / battersFaced. Fallback if battersFaced missing/zero:
+    // derive an approximate K% from K/9 (a starter faces ~38 batters per 9 innings).
+    let kRate = pitcherKRate(so, bf);
+    if (kRate == null && k9 != null) {
+      const k9n = parseFloat(k9);
+      if (!isNaN(k9n) && k9n > 0) kRate = Math.min(0.5, k9n / 38);
+    }
+    const kPct = kRate != null ? (kRate * 100).toFixed(1) + "%" : "–";
+
+    // store for the opposing lineup's strikeout-chance math
+    pitcherStore[gamePk] = pitcherStore[gamePk] || {};
+    pitcherStore[gamePk][side] = { kRate, name: person.fullName };
+
+    const teamLabel = el.querySelector(".pteam")?.outerHTML || "";
+    el.innerHTML = `${teamLabel}
+      <span class="rating-pill ${rt.cls}">${rt.label}</span><br>
+      <span class="pname">${person.fullName}</span>
+      <span class="pstat">(${w ?? "–"}-${l ?? "–"})</span><br>
+      <span class="pstat">ERA <span>${era ?? "–"}</span> · WHIP <span>${whip ?? "–"}</span> · K/9 <span>${k9 ?? "–"}</span> · K% <span>${kPct}</span></span>`;
+
+    // now that this pitcher's K% is known, (re)render the hitters on the other side
+    refreshOpposingHitters(gamePk, side);
+  } catch (e) {
+    el.innerHTML = el.innerHTML.replace("Loading probable…", `<span class='pname'>${p.fullName||"?"}</span> <span class='pstat'>(stats unavailable)</span>`);
+    pitcherStore[gamePk] = pitcherStore[gamePk] || {};
+    pitcherStore[gamePk][side] = { kRate: null, name: p.fullName || "?" };
+    refreshOpposingHitters(gamePk, side);
+  }
+}
+
+// When a pitcher on `side` loads, the hitters who face them are on the other side.
+// If those hitter rows are already cached, re-render them to fill in K-chance.
+function refreshOpposingHitters(gamePk, pitcherSide) {
+  const hitterSide = pitcherSide === "home" ? "away" : "home";
+  const cache = hitterRowCache[`${gamePk}-${hitterSide}`];
+  if (cache) renderHitterTable(gamePk, hitterSide, cache);
+}
+
+// Cache of computed hitter rows per team-side so we can re-render once the
+// opposing pitcher's K-rate arrives (the two loads race each other).
+const hitterRowCache = {};
+
+async function fillTeamHitters(gamePk, teamId, abbr, side) {
+  const el = document.getElementById(`bat-${gamePk}-${side}`);
+  if (!el) return;
+  try {
+    const season = new Date().getFullYear();
+    // One call gets the active roster with each player's SEASON hitting stats + last-15-day window.
+    const start = daysAgo(15);
+    const end = ymd(new Date());
+    const url = `${API}/teams/${teamId}/roster?rosterType=active&hydrate=person(stats(type=[season,byDateRange],group=[hitting],season=${season},startDate=${start},endDate=${end}))`;
+    const data = await getJSON(url);
+
+    let rows = [];
+    for (const r of data.roster || []) {
+      if (r.position && r.position.abbreviation === "P") continue;
+      const person = r.person;
+      if (!person || !person.stats) continue;
+
+      let seasonStat = null, rangeStat = null;
+      for (const s of person.stats) {
+        const split = s.splits && s.splits[0] ? s.splits[0].stat : null;
+        if (!split) continue;
+        const type = s.type?.displayName || "";
+        if (type === "season") seasonStat = split;
+        else if (type === "byDateRange") rangeStat = split;
+      }
+      if (!seasonStat || (seasonStat.atBats || 0) < 20) continue; // skip tiny samples
+
+      const so = seasonStat.strikeOuts;
+      const pa = seasonStat.plateAppearances;
+      rows.push({
+        name: person.fullName,
+        pos: r.position?.abbreviation || "",
+        avg: seasonStat.avg, ops: seasonStat.ops, obp: seasonStat.obp, slg: seasonStat.slg,
+        h: seasonStat.hits, hr: seasonStat.homeRuns, rbi: seasonStat.rbi, ab: seasonStat.atBats,
+        so: so, pa: pa,
+        kRate: batterKRate(so, pa),          // batter strikeout rate (season)
+        rAvg: rangeStat ? rangeStat.avg : null,
+        rH: rangeStat ? rangeStat.hits : null,
+        rHR: rangeStat ? rangeStat.homeRuns : 0,
+        rAB: rangeStat ? rangeStat.atBats : 0
+      });
+    }
+
+    if (!rows.length) {
+      el.innerHTML = `<div class="empty-side">No qualifying hitter stats available yet.</div>`;
+      hitterRowCache[`${gamePk}-${side}`] = [];
+      return;
+    }
+
+    // RANKING: blend recent form with season production.
+    function score(r) {
+      const sOps = parseFloat(r.ops) || 0;
+      const rAvg = parseFloat(r.rAvg) || 0;
+      const recentHR = r.rHR || 0;
+      const recentH = r.rH || 0;
+      return sOps * 100 + rAvg * 80 + recentHR * 12 + recentH * 1.5;
+    }
+    rows.sort((a,b) => score(b) - score(a));
+    const top = rows.slice(0, 6);
+
+    hitterRowCache[`${gamePk}-${side}`] = top;
+    renderHitterTable(gamePk, side, top);
+  } catch (e) {
+    el.innerHTML = `<div class="empty-side err">Hitter data unavailable (${e.message}).</div>`;
+  }
+}
+
+// Renders the hitter table. Pulls the OPPOSING pitcher's K-rate from pitcherStore
+// to compute each hitter's strikeout chance for this matchup. Safe to call repeatedly.
+function renderHitterTable(gamePk, side, top) {
+  const el = document.getElementById(`bat-${gamePk}-${side}`);
+  if (!el || !top || !top.length) return;
+
+  const oppSide = side === "home" ? "away" : "home";
+  const opp = (pitcherStore[gamePk] || {})[oppSide];
+  // oppKRate: a real number if the pitcher loaded, null if loaded-but-no-Kdata,
+  // undefined if the pitcher fetch hasn't resolved yet.
+  let oppKRate = opp ? opp.kRate : undefined;
+  let oppName = opp ? opp.name : null;
+
+  // If there's no probable pitcher (common for games 2+ days out) or the pitcher
+  // had no usable K data, fall back to a LEAGUE-AVERAGE pitcher so K Chance still
+  // shows a meaningful number, clearly labeled as "vs lg-avg".
+  let usingLeagueAvg = false;
+  if (opp !== undefined && (oppKRate === null)) {
+    oppKRate = LEAGUE_K_RATE;
+    usingLeagueAvg = true;
+    if (!oppName || oppName === "TBD") oppName = "lg-avg";
+  }
+
+  // header note about who the K-chance is against
+  let kHeaderTip = "Estimated chance of a strikeout per plate appearance vs. the opposing starter";
+  let projTip = "Projected strikeouts this game (per-PA chance × ~4.1 PA)";
+
+  let html = `<table><thead><tr>
+    <th>Hitter</th><th>AVG</th><th class="hide-sm">OPS</th>
+    <th title="Strikeouts this season">SO</th>
+    <th title="Batter strikeout rate: SO ÷ PA">K%</th>
+    <th title="${projTip}">K&nbsp;Chance</th>
+    <th class="hide-sm" title="Home runs, last 15 days">HR&nbsp;15d</th>
+  </tr></thead><tbody>`;
+
+  for (const r of top) {
+    const recentAvg = parseFloat(r.rAvg) || 0;
+    const hot = (recentAvg >= 0.300 && (r.rAB||0) >= 10) ? '<span class="hot-flag" title="Batting .300+ over last 15 days">HOT</span>' : '';
+    const recentHRcell = (r.rHR||0) > 0 ? `<span class="hr-badge">${r.rHR}</span>` : '<span style="color:var(--muted)">0</span>';
+    const bK = r.kRate != null ? (r.kRate * 100).toFixed(1) + "%" : "–";
+
+    // strikeout chance vs this pitcher (or league-average fallback)
+    let kCell;
+    if (oppKRate === undefined) {
+      kCell = `<span class="kc-na" title="Waiting on opposing pitcher stats">…</span>`;
+    } else if (oppKRate == null || r.kRate == null) {
+      kCell = `<span class="kc-na" title="Insufficient data">n/a</span>`;
+    } else {
+      const p = matchupKProb(r.kRate, oppKRate);
+      const proj = (p * EXPECTED_PA_PER_GAME);
+      const pct = Math.round(p * 100);
+      const vsLabel = usingLeagueAvg ? "league-average pitcher" : oppName;
+      const star = usingLeagueAvg ? '<span class="kavg" title="No probable pitcher posted yet — estimate vs league-average pitcher">*</span>' : '';
+      kCell = `<span class="kchance ${kChanceClass(p)}" title="~${pct}% per PA · ~${proj.toFixed(1)} K projected vs ${vsLabel}">${pct}% <span class="kproj">(${proj.toFixed(1)})</span>${star}</span>`;
+    }
+
+    html += `<tr>
+      <td class="pname-cell">${r.name}<span class="pos">${r.pos}</span>${hot}</td>
+      <td class="num-strong">${fmt3(r.avg)}</td>
+      <td class="hide-sm">${fmt3(r.ops)}</td>
+      <td>${r.so ?? "–"}</td>
+      <td>${bK}</td>
+      <td>${kCell}</td>
+      <td class="hide-sm">${recentHRcell}</td>
+    </tr>`;
+  }
+  html += `</tbody></table>`;
+  if (usingLeagueAvg) {
+    html += `<div class="kfoot">No probable pitcher posted yet — K Chance (<span class="kavg">*</span>) estimated vs a <b>league-average pitcher</b>. Reload once the starter is announced for a matchup-specific number.</div>`;
+  } else if (oppName) {
+    html += `<div class="kfoot">K Chance vs. opposing starter <b>${oppName}</b> · % = per plate appearance, (n) = projected Ks this game</div>`;
+  }
+  el.innerHTML = html;
+}
+
+function fmt3(v) {
+  if (v == null) return "–";
+  const n = parseFloat(v);
+  if (isNaN(n)) return v;
+  return n.toFixed(3).replace(/^0/, ""); // .312 style
+}
+
+function stampTime() {
+  const now = new Date();
+  updatedEl.textContent = now.toLocaleString([], {weekday:'short', month:'short', day:'numeric', hour:'numeric', minute:'2-digit'});
+}
+
+// ========================================================================
+// LEADERBOARD: top 75 qualified hitters, every column sortable
+// ========================================================================
+let leaderRows = null; // cached so re-sorting doesn't re-fetch
+let leaderSort = { key: "ops", dir: "desc" }; // current sort state
+
+async function loadLeaders() {
+  const el = document.getElementById("leadersContent");
+  el.innerHTML = '<div class="status-msg"><div class="spinner"></div>Loading leaderboard…</div>';
+  try {
+    const season = new Date().getFullYear();
+    // One call: all qualified hitters' season stat lines. We sort client-side.
+    const url = `${API}/stats?stats=season&group=hitting&season=${season}&sportId=1&playerPool=qualified&limit=300`;
+    const data = await getJSON(url);
+    const splits = (data.stats && data.stats[0] && data.stats[0].splits) ? data.stats[0].splits : [];
+
+    leaderRows = splits.map(s => {
+      const st = s.stat || {};
+      const player = s.player || {};
+      const team = s.team || {};
+      const so = st.strikeOuts, pa = st.plateAppearances;
+      return {
+        name: player.fullName || "—",
+        team: team.abbreviation || team.teamName || "",
+        avg: st.avg, obp: st.obp, slg: st.slg, ops: st.ops,
+        hits: st.hits, doubles: st.doubles, triples: st.triples,
+        homeRuns: st.homeRuns, rbi: st.rbi, runs: st.runs,
+        baseOnBalls: st.baseOnBalls, stolenBases: st.stolenBases,
+        strikeOuts: so, pa: pa, atBats: st.atBats,
+        kRate: batterKRate(so, pa)
+      };
+    }).filter(r => r.name !== "—");
+
+    if (!leaderRows.length) {
+      el.innerHTML = '<div class="status-msg">No qualified hitter data available yet for this season.</div>';
+      return;
+    }
+    renderLeaders();
+    stampTime();
+  } catch (e) {
+    el.innerHTML = '<div class="status-msg err">Could not load leaderboard: ' + e.message +
+      '<br><br>If this persists, the network may have blocked statsapi.mlb.com.</div>';
+  }
+}
+
+// Column definitions: key, label, whether it's a rate (.xxx format), and default sort direction.
+// asc:true means "lower is better" so first click sorts ascending (only K%).
+const LEAD_COLS = [
+  { key: "name",        label: "Hitter",  type: "text" },
+  { key: "team",        label: "Team",    type: "text" },
+  { key: "avg",         label: "AVG",     type: "rate" },
+  { key: "obp",         label: "OBP",     type: "rate", sm: true },
+  { key: "slg",         label: "SLG",     type: "rate", sm: true },
+  { key: "ops",         label: "OPS",     type: "rate" },
+  { key: "hits",        label: "H",       type: "int"  },
+  { key: "doubles",     label: "2B",      type: "int", sm: true },
+  { key: "triples",     label: "3B",      type: "int", sm: true },
+  { key: "homeRuns",    label: "HR",      type: "int"  },
+  { key: "rbi",         label: "RBI",     type: "int"  },
+  { key: "runs",        label: "R",       type: "int", sm: true },
+  { key: "baseOnBalls", label: "BB",      type: "int", sm: true },
+  { key: "stolenBases", label: "SB",      type: "int", sm: true },
+  { key: "strikeOuts",  label: "SO",      type: "int"  },
+  { key: "kRate",       label: "K%",      type: "krate" },
+];
+
+function sortLeaders(key) {
+  // toggle direction if same column; otherwise pick a sensible default
+  if (leaderSort.key === key) {
+    leaderSort.dir = leaderSort.dir === "desc" ? "asc" : "desc";
+  } else {
+    leaderSort.key = key;
+    // text sorts ascending by default; everything else descending (higher = better/more)
+    const col = LEAD_COLS.find(c => c.key === key);
+    leaderSort.dir = (col && col.type === "text") ? "asc" : "desc";
+  }
+  renderLeaders();
+}
+
+function renderLeaders() {
+  if (!leaderRows) return;
+  const el = document.getElementById("leadersContent");
+  const { key, dir } = leaderSort;
+  const col = LEAD_COLS.find(c => c.key === key) || LEAD_COLS[5];
+
+  const rows = leaderRows.slice();
+  rows.sort((a, b) => {
+    let av, bv;
+    if (col.type === "text") {
+      av = (a[key] || "").toString().toLowerCase();
+      bv = (b[key] || "").toString().toLowerCase();
+      if (av < bv) return dir === "asc" ? -1 : 1;
+      if (av > bv) return dir === "asc" ? 1 : -1;
+      return 0;
+    }
+    // numeric (rate, int, krate)
+    av = a[key] == null ? null : parseFloat(a[key]);
+    bv = b[key] == null ? null : parseFloat(b[key]);
+    if (av == null || isNaN(av)) av = dir === "asc" ? Infinity : -Infinity;
+    if (bv == null || isNaN(bv)) bv = dir === "asc" ? Infinity : -Infinity;
+    return dir === "asc" ? av - bv : bv - av;
+  });
+  const top = rows.slice(0, 75);
+
+  // keep the dropdown in sync if the key maps to one of its options
+  syncSortDropdown(key, dir);
+
+  // build header with sort arrows
+  const arrow = dir === "desc" ? " ▾" : " ▴";
+  let head = `<tr><th>#</th>`;
+  for (const c of LEAD_COLS) {
+    const on = c.key === key;
+    const smCls = c.sm ? "hide-sm " : "";
+    head += `<th class="${smCls}lead-th${on ? " sort-on" : ""}" data-key="${c.key}">${c.label}${on ? arrow : ""}</th>`;
+  }
+  head += `</tr>`;
+
+  let html = `<table class="lead-table"><thead>${head}</thead><tbody>`;
+  top.forEach((r, i) => {
+    const bK = r.kRate != null ? (r.kRate * 100).toFixed(1) + "%" : "–";
+    const hrCell = (r.homeRuns||0) > 0 ? `<span class="hr-badge">${r.homeRuns}</span>` : '0';
+    let tds = `<td class="rank-num">${i+1}</td>`;
+    for (const c of LEAD_COLS) {
+      const on = c.key === key;
+      const smCls = c.sm ? "hide-sm" : "";
+      let cell;
+      if (c.key === "name")      cell = `<span class="pname-cell">${r.name}</span>`;
+      else if (c.key === "team") cell = `<span style="color:var(--accent-2)">${r.team}</span>`;
+      else if (c.key === "homeRuns") cell = hrCell;
+      else if (c.key === "kRate")    cell = bK;
+      else if (c.type === "rate")    cell = fmt3(r[c.key]);
+      else                           cell = (r[c.key] ?? "–");
+      const strong = on && c.type !== "text" ? "num-strong" : "";
+      tds += `<td class="${smCls} ${strong}">${cell}</td>`;
+    }
+    html += `<tr>${tds}</tr>`;
+  });
+  html += `</tbody></table>`;
+  html += `<div class="kfoot">Showing top 75 qualified hitters · click any column header to sort · sorting by <b>${col.label}</b> (${dir === "desc" ? "high→low" : "low→high"})</div>`;
+  el.innerHTML = html;
+
+  // wire header clicks
+  el.querySelectorAll(".lead-th").forEach(th => {
+    th.onclick = () => sortLeaders(th.dataset.key);
+  });
+}
+
+// Keep the quick-pick dropdown in sync with header-click sorts where possible.
+function syncSortDropdown(key, dir) {
+  const sel = document.getElementById("sortPick");
+  if (!sel) return;
+  let val = null;
+  if (key === "kRate" && dir === "asc") val = "krateLow";
+  else if (["ops","avg","homeRuns","hits","rbi","strikeOuts"].includes(key) && dir === "desc") val = key;
+  if (val) sel.value = val;
+}
+
+// ========================================================================
+// TODAY'S TOP HITTER PICKS — career composite, slate-scoped
+// ========================================================================
+let pickRows = null;            // cached scored rows for current date
+const picksCache = {};          // by date string (career stats don't change intraday)
+const PICK_MIN_CAREER_AB = 250; // established-hitter floor
+
+// Composite score from career stats, by pick type. Each component is measured against an
+// MLB career benchmark so they share a scale. Result is an index (~100 = elite for that type).
+function pickScoreByType(type, cAvg, cHits, cHR, cAB) {
+  const avgComp    = (cAvg  || 0) / 0.300;
+  const hitsComp   = (cHits || 0) / 2000;
+  const hrComp     = (cHR   || 0) / 300;
+  const hrRate     = cAB > 0 ? cHR / cAB : 0;
+  const hrRateComp = hrRate / 0.05;          // ~.05 HR/AB (1 per 20) is elite power
+  if (type === "power")   return (hrComp * 0.45 + hrRateComp * 0.25 + avgComp * 0.15 + hitsComp * 0.15) * 100;
+  if (type === "contact") return (avgComp * 0.60 + hitsComp * 0.30 + hrComp * 0.10) * 100;
+  return (avgComp * 0.40 + hitsComp * 0.30 + hrComp * 0.30) * 100; // balanced
+}
+
+async function loadPicks(dateStr) {
+  const el = document.getElementById("picksContent");
+  el.innerHTML = '<div class="status-msg"><div class="spinner"></div>Loading today\'s lineups…</div>';
+  try {
+    if (picksCache[dateStr]) { pickRows = picksCache[dateStr]; renderPicks(); stampTime(); return; }
+
+    const season = new Date().getFullYear();
+    const sched = await getJSON(`${API}/schedule?sportId=1&date=${dateStr}&hydrate=team`);
+    const dates = sched.dates || [];
+    if (!dates.length || !dates[0].games || !dates[0].games.length) {
+      el.innerHTML = '<div class="status-msg">No MLB games scheduled for <strong>' + dateStr + '</strong>. Try another date.</div>';
+      return;
+    }
+    const teamMap = {};
+    for (const g of dates[0].games) {
+      const h = g.teams.home.team, a = g.teams.away.team;
+      teamMap[h.id] = h.abbreviation || h.name;
+      teamMap[a.id] = a.abbreviation || a.name;
+    }
+    const teamIds = Object.keys(teamMap);
+
+    // One roster call per team, hydrating CAREER + SEASON hitting (no per-player calls needed).
+    let rows = [];
+    let teamsDone = 0;
+    for (const tid of teamIds) {
+      try {
+        const roster = await getJSON(`${API}/teams/${tid}/roster?rosterType=active&hydrate=person(stats(type=[career,season],group=[hitting],season=${season}))`);
+        for (const r of roster.roster || []) {
+          if (r.position && r.position.abbreviation === "P") continue;
+          const person = r.person;
+          if (!person || !person.stats) continue;
+          let careerStat = null, seasonStat = null;
+          for (const s of person.stats) {
+            const t = s.type?.displayName;
+            const split = s.splits && s.splits[0] ? s.splits[0].stat : null;
+            if (!split) continue;
+            if (t === "career") careerStat = split;
+            else if (t === "season") seasonStat = split;
+          }
+          if (!careerStat) continue;
+          const cAB = careerStat.atBats || 0;
+          if (cAB < PICK_MIN_CAREER_AB) continue;
+          const cHits = careerStat.hits || 0;
+          const cHR = careerStat.homeRuns || 0;
+          const cAvg = careerStat.avg != null ? parseFloat(careerStat.avg) : (cAB > 0 ? cHits / cAB : 0);
+          rows.push({
+            name: person.fullName, team: teamMap[tid], pos: r.position?.abbreviation || "",
+            cAB, cHits, cHR, cAvg, hrRate: cAB > 0 ? cHR / cAB : 0,
+            sznAvg: seasonStat && seasonStat.avg != null ? seasonStat.avg : null
+          });
+        }
+      } catch (e) { /* skip team on error */ }
+      teamsDone++;
+      el.innerHTML = `<div class="progress-wrap">Scoring hitters from ${teamsDone}/${teamIds.length} teams…<div class="progress-bar-track"><div class="progress-bar-fill" style="width:${Math.round(teamsDone/teamIds.length*100)}%"></div></div></div>`;
+    }
+
+    // de-dupe by name+team
+    const seen = {};
+    rows = rows.filter(r => { const k = r.name + "|" + r.team; if (seen[k]) return false; seen[k] = 1; return true; });
+
+    if (!rows.length) {
+      el.innerHTML = '<div class="status-msg">No qualifying hitters found for this slate.</div>';
+      return;
+    }
+    pickRows = rows;
+    picksCache[dateStr] = rows;
+    renderPicks();
+    stampTime();
+  } catch (e) {
+    el.innerHTML = '<div class="status-msg err">Could not load picks: ' + e.message + '</div>';
+  }
+}
+
+function renderPicks() {
+  if (!pickRows) return;
+  const el = document.getElementById("picksContent");
+  const count = parseInt(document.getElementById("picksCount").value, 10) || 15;
+  const type = document.getElementById("pickType").value || "balanced";
+
+  // score by selected type, then sort + slice
+  const scored = pickRows.map(r => ({ ...r, score: pickScoreByType(type, r.cAvg, r.cHits, r.cHR, r.cAB) }));
+  scored.sort((a, b) => b.score - a.score);
+  const top = scored.slice(0, count);
+  const maxScore = top.length ? top[0].score : 100;
+
+  const typeLabel = type === "power" ? "Power (HR 45% + HR/AB 25% + AVG 15% + hits 15%)"
+                  : type === "contact" ? "Contact (AVG 60% + hits 30% + HR 10%)"
+                  : "Balanced (AVG 40% + hits 30% + HR 30%)";
+
+  let html = `<table class="lead-table"><thead><tr>
+    <th>#</th><th>Hitter</th><th>Team</th>
+    <th class="hide-sm" title="Career at-bats">AB</th>
+    <th title="Career hits">H</th>
+    <th title="Career home runs">HR</th>
+    <th title="Career batting average">AVG</th>
+    <th class="hide-sm" title="Career home runs per at-bat">HR/AB</th>
+    <th class="hide-sm" title="This season's average">SznAVG</th>
+    <th title="Career composite pick score">Pick Score</th>
+  </tr></thead><tbody>`;
+
+  top.forEach((r, i) => {
+    const medal = i === 0 ? '<span class="pick-rank-medal">🥇</span>' : i === 1 ? '<span class="pick-rank-medal">🥈</span>' : i === 2 ? '<span class="pick-rank-medal">🥉</span>' : (i + 1);
+    const barPct = Math.max(4, Math.round((r.score / maxScore) * 100));
+    const hrRateStr = r.cAB > 0 ? (r.hrRate).toFixed(3).replace(/^0/, "") : "–";
+    html += `<tr>
+      <td class="rank-num">${medal}</td>
+      <td class="pname-cell">${r.name}<span class="pos">${r.pos}</span></td>
+      <td style="color:var(--accent-2)">${r.team}</td>
+      <td class="hide-sm">${r.cAB.toLocaleString()}</td>
+      <td>${r.cHits.toLocaleString()}</td>
+      <td class="${type==='power'?'num-strong':''}">${r.cHR}</td>
+      <td class="${type==='contact'?'num-strong':''}">${fmt3(r.cAvg)}</td>
+      <td class="hide-sm">${hrRateStr}</td>
+      <td class="hide-sm">${fmt3(r.sznAvg)}</td>
+      <td><div class="pick-score-cell"><div class="pick-bar-track"><div class="pick-bar-fill" style="width:${barPct}%"></div></div><span class="pick-score-num">${Math.round(r.score)}</span></div></td>
+    </tr>`;
+  });
+  html += `</tbody></table>`;
+  html += `<div class="kfoot">Top ${count} career hitters in today's slate · ${typeLabel} vs MLB benchmarks · ${PICK_MIN_CAREER_AB}+ career AB minimum</div>`;
+  el.innerHTML = html;
+}
+
+// ========================================================================
+// MATCHUP TARGETS — most hittable probable starters + the bats facing them
+// ========================================================================
+let targetRows = null;
+const targetsCache = {};        // by "date|window"
+// League baselines for the vulnerability rating (rough recent-MLB averages).
+const LG = { k9: 8.5, whip: 1.30, h9: 8.6, hr9: 1.20 };
+
+// Hittability: higher = more vulnerable. Positive contribution when a pitcher is worse
+// than league average at missing bats (low K/9) or limiting bases (high WHIP/H9/HR9).
+function hittability(k9, whip, h9, hr9) {
+  const kT = (LG.k9 - (k9 == null ? LG.k9 : k9)) / LG.k9;       // fewer Ks than avg → positive
+  const wT = ((whip == null ? LG.whip : whip) - LG.whip) / LG.whip;
+  const hT = ((h9 == null ? LG.h9 : h9) - LG.h9) / LG.h9;
+  const rT = ((hr9 == null ? LG.hr9 : hr9) - LG.hr9) / LG.hr9;
+  const raw = kT * 0.30 + wT * 0.30 + hT * 0.25 + rT * 0.15;
+  return Math.max(0, Math.min(100, 50 + raw * 100));
+}
+function hitClass(score) {
+  if (score >= 60) return { cls: "hit-high", label: "HIGH" };
+  if (score >= 45) return { cls: "hit-med",  label: "MEDIUM" };
+  return { cls: "hit-low", label: "LOW" };
+}
+
+async function loadTargets(dateStr, win) {
+  const el = document.getElementById("targetsContent");
+  const cacheKey = `${dateStr}|${win}`;
+  el.innerHTML = '<div class="status-msg"><div class="spinner"></div>Loading slate…</div>';
+  try {
+    if (targetsCache[cacheKey]) { targetRows = targetsCache[cacheKey]; renderTargets(); stampTime(); return; }
+    const season = new Date().getFullYear();
+    const sched = await getJSON(`${API}/schedule?sportId=1&date=${dateStr}&hydrate=probablePitcher,team`);
+    const dates = sched.dates || [];
+    if (!dates.length || !dates[0].games || !dates[0].games.length) {
+      el.innerHTML = '<div class="status-msg">No MLB games scheduled for <strong>' + dateStr + '</strong>. Try another date.</div>';
+      return;
+    }
+
+    // collect (pitcher, opposing team) pairs from probable starters
+    const pairs = [];
+    const oppTeamIds = new Set();
+    for (const g of dates[0].games) {
+      const home = g.teams.home, away = g.teams.away;
+      if (away.probablePitcher) { pairs.push({ pid: away.probablePitcher.id, pname: away.probablePitcher.fullName, pTeam: away.team.abbreviation || away.team.name, oppId: home.team.id, oppName: home.team.abbreviation || home.team.name }); oppTeamIds.add(home.team.id); }
+      if (home.probablePitcher) { pairs.push({ pid: home.probablePitcher.id, pname: home.probablePitcher.fullName, pTeam: home.team.abbreviation || home.team.name, oppId: away.team.id, oppName: away.team.abbreviation || away.team.name }); oppTeamIds.add(away.team.id); }
+    }
+    if (!pairs.length) {
+      el.innerHTML = '<div class="status-msg">No probable starting pitchers are posted yet for <strong>' + dateStr + '</strong>. Starters are usually announced a day or two out — try again closer to game day.</div>';
+      return;
+    }
+
+    // opposing lineups: top hitters by season OPS (one roster call per opposing team)
+    el.innerHTML = '<div class="progress-wrap">Loading lineups…<div class="progress-bar-track"><div class="progress-bar-fill" style="width:10%"></div></div></div>';
+    const topBatsByTeam = {};
+    for (const tid of oppTeamIds) {
+      try {
+        const roster = await getJSON(`${API}/teams/${tid}/roster?rosterType=active&hydrate=person(stats(type=[season],group=[hitting],season=${season}))`);
+        let bats = [];
+        for (const r of roster.roster || []) {
+          if (r.position && r.position.abbreviation === "P") continue;
+          const person = r.person;
+          const st = person?.stats?.find(s => s.group?.displayName === "hitting")?.splits?.[0]?.stat;
+          if (!st || (st.atBats || 0) < 30) continue;
+          bats.push({ name: person.fullName, ops: st.ops != null ? parseFloat(st.ops) : 0, avg: st.avg, hr: st.homeRuns || 0 });
+        }
+        bats.sort((a, b) => b.ops - a.ops);
+        topBatsByTeam[tid] = bats.slice(0, 5);
+      } catch (e) { topBatsByTeam[tid] = []; }
+    }
+
+    // pitcher vulnerability per window (season from people hydrate; recent from game logs)
+    const results = await runPooled(pairs, async (pr) => {
+      let k9 = null, whip = null, h9 = null, hr9 = null, era = null, ipStr = "–";
+      if (win === "season") {
+        const data = await getJSON(`${API}/people/${pr.pid}?hydrate=stats(group=[pitching],type=[season],season=${season})`);
+        const st = data.people?.[0]?.stats?.[0]?.splits?.[0]?.stat || {};
+        k9 = st.strikeoutsPer9Inn != null ? parseFloat(st.strikeoutsPer9Inn) : null;
+        whip = st.whip != null ? parseFloat(st.whip) : null;
+        h9 = st.hitsPer9Inn != null ? parseFloat(st.hitsPer9Inn) : null;
+        hr9 = st.homeRunsPer9 != null ? parseFloat(st.homeRunsPer9) : null;
+        era = st.era != null ? st.era : null;
+        ipStr = st.inningsPitched != null ? st.inningsPitched : "–";
+      } else {
+        const gamesN = parseInt(win, 10);
+        const data = await getJSON(`${API}/people/${pr.pid}/stats?stats=gameLog&group=pitching&season=${season}`);
+        const splits = data.stats?.[0]?.splits || [];
+        const lastN = splits.slice(-gamesN);
+        let outs = 0, h = 0, bb = 0, k = 0, hr = 0, er = 0;
+        for (const s of lastN) {
+          const st = s.stat || {};
+          outs += ipToOuts(st.inningsPitched);
+          h += st.hits || 0; bb += st.baseOnBalls || 0; k += st.strikeOuts || 0;
+          hr += st.homeRuns || 0; er += st.earnedRuns || 0;
+        }
+        if (outs > 0) {
+          k9 = k * 27 / outs; whip = (h + bb) * 3 / outs; h9 = h * 27 / outs; hr9 = hr * 27 / outs;
+          era = (er * 27 / outs).toFixed(2); ipStr = outsToIp(outs);
+        }
+      }
+      const score = hittability(k9, whip, h9, hr9);
+      return { ...pr, k9, whip, h9, hr9, era, ipStr, score, bats: topBatsByTeam[pr.oppId] || [] };
+    }, 5, (done, total) => setScanProgress("targetsContent", done, total, "Scouting starters"));
+
+    targetRows = results.filter(Boolean).filter(r => r.k9 != null || r.whip != null);
+    if (!targetRows.length) {
+      el.innerHTML = '<div class="status-msg">Couldn\'t pull pitcher stats for this slate' + (win === "season" ? "" : " in the selected window") + '. Try the season window, or another date.</div>';
+      return;
+    }
+    targetRows.sort((a, b) => b.score - a.score); // most hittable first
+    targetsCache[cacheKey] = targetRows;
+    renderTargets();
+    stampTime();
+  } catch (e) {
+    el.innerHTML = '<div class="status-msg err">Could not load targets: ' + e.message + '</div>';
+  }
+}
+
+function renderTargets() {
+  if (!targetRows) return;
+  const el = document.getElementById("targetsContent");
+  const winLabel = (document.getElementById("targetsWindow").value === "season") ? "season"
+                 : "last " + document.getElementById("targetsWindow").value + " games";
+
+  let html = "";
+  for (const r of targetRows) {
+    const hc = hitClass(r.score);
+    let batsHtml = "";
+    if (r.bats.length) {
+      batsHtml = r.bats.map(b => `<span class="bat-chip"><span class="bname">${b.name}</span><span class="bstat">${fmt3(b.avg)} · ${b.hr} HR</span></span>`).join("");
+    } else {
+      batsHtml = '<span style="color:var(--muted);font-size:12px;">Lineup not available yet.</span>';
+    }
+    html += `<div class="target-card">
+      <div class="target-head">
+        <span class="target-pitcher">${r.pname}</span>
+        <span class="hit-pill ${hc.cls}">${hc.label} · ${Math.round(r.score)}</span>
+        <span class="target-vs">${r.pTeam} starter · ${r.oppName} bats facing him</span>
+      </div>
+      <div class="target-statline">
+        <span>IP <b>${r.ipStr}</b></span>
+        <span>K/9 <b>${fmtRate2(r.k9)}</b></span>
+        <span>WHIP <b>${fmtRate2(r.whip)}</b></span>
+        <span>H/9 <b>${fmtRate2(r.h9)}</b></span>
+        <span>HR/9 <b>${fmtRate2(r.hr9)}</b></span>
+        <span>ERA <b>${r.era != null ? r.era : "–"}</b></span>
+      </div>
+      <div class="target-bats">
+        <div class="target-bats-label">🎯 ${r.oppName} bats facing ${r.pname} (top by OPS)</div>
+        ${batsHtml}
+      </div>
+    </div>`;
+  }
+  html += `<div class="kfoot">Probable starters on this slate, ranked most hittable first · vulnerability over ${winLabel} · Hittability from low K/9 + high WHIP/H9/HR9</div>`;
+  el.innerHTML = html;
+}
+
+// ========================================================================
+// PITCHER LEADERBOARDS (Top + Worst share this engine)
+// ========================================================================
+let pitcherRows = null; // cached raw rows, shared by both pitcher tabs
+
+// Columns for pitcher tables. "asc:true" = lower is better (first click sorts ascending).
+const PITCH_COLS = [
+  { key: "name",              label: "Pitcher", type: "text" },
+  { key: "team",              label: "Team",    type: "text" },
+  { key: "wl",                label: "W-L",     type: "wl" },
+  { key: "era",               label: "ERA",     type: "rate", asc: true },
+  { key: "whip",              label: "WHIP",    type: "rate", asc: true },
+  { key: "inningsPitched",    label: "IP",      type: "num" },
+  { key: "strikeOuts",        label: "SO",      type: "int" },
+  { key: "strikeoutsPer9Inn", label: "K/9",     type: "rate2" },
+  { key: "baseOnBalls",       label: "BB",      type: "int", sm: true },
+  { key: "homeRuns",          label: "HR",      type: "int", sm: true },
+  { key: "earnedRuns",        label: "ER",      type: "int", sm: true },
+  { key: "kRate",             label: "K%",      type: "krateHi" },
+];
+
+async function loadPitchers() {
+  // fetch once; both tabs reuse the cache
+  const targets = [document.getElementById("topPitchContent"), document.getElementById("worstPitchContent")];
+  targets.forEach(t => { if (t) t.innerHTML = '<div class="status-msg"><div class="spinner"></div>Loading pitchers…</div>'; });
+  try {
+    const season = new Date().getFullYear();
+    const url = `${API}/stats?stats=season&group=pitching&season=${season}&sportId=1&playerPool=qualified&limit=300`;
+    const data = await getJSON(url);
+    const splits = (data.stats && data.stats[0] && data.stats[0].splits) ? data.stats[0].splits : [];
+
+    pitcherRows = splits.map(s => {
+      const st = s.stat || {};
+      const player = s.player || {};
+      const team = s.team || {};
+      const so = st.strikeOuts, bf = st.battersFaced;
+      let kRate = pitcherKRate(so, bf);
+      if (kRate == null && st.strikeoutsPer9Inn != null) {
+        const k9 = parseFloat(st.strikeoutsPer9Inn);
+        if (!isNaN(k9) && k9 > 0) kRate = Math.min(0.5, k9 / 38);
+      }
+      return {
+        name: player.fullName || "—",
+        team: team.abbreviation || team.teamName || "",
+        wins: st.wins, losses: st.losses,
+        era: st.era, whip: st.whip,
+        inningsPitched: st.inningsPitched,
+        strikeOuts: so, strikeoutsPer9Inn: st.strikeoutsPer9Inn,
+        baseOnBalls: st.baseOnBalls, homeRuns: st.homeRuns, earnedRuns: st.earnedRuns,
+        kRate: kRate
+      };
+    }).filter(r => r.name !== "—");
+
+    if (!pitcherRows.length) {
+      targets.forEach(t => { if (t) t.innerHTML = '<div class="status-msg">No qualified pitcher data available yet for this season.</div>'; });
+      return;
+    }
+    renderPitchers("top");
+    renderPitchers("worst");
+    stampTime();
+  } catch (e) {
+    targets.forEach(t => { if (t) t.innerHTML = '<div class="status-msg err">Could not load pitchers: ' + e.message + '</div>'; });
+  }
+}
+
+// sort state per pitcher tab
+const pitchSort = {
+  top:   { key: "era", dir: "asc"  },  // best ERA first
+  worst: { key: "era", dir: "desc" },  // worst ERA first
+};
+
+function sortPitchers(which, key) {
+  const st = pitchSort[which];
+  if (st.key === key) {
+    st.dir = st.dir === "desc" ? "asc" : "desc";
+  } else {
+    st.key = key;
+    const col = PITCH_COLS.find(c => c.key === key);
+    if (col && col.type === "text") st.dir = "asc";
+    else if (col && col.asc) st.dir = "asc";   // ERA/WHIP default ascending (lower better)
+    else st.dir = "desc";
+  }
+  renderPitchers(which);
+}
+
+function renderPitchers(which) {
+  if (!pitcherRows) return;
+  const elId = which === "top" ? "topPitchContent" : "worstPitchContent";
+  const el = document.getElementById(elId);
+  if (!el) return;
+  const { key, dir } = pitchSort[which];
+  const col = PITCH_COLS.find(c => c.key === key) || PITCH_COLS[3];
+
+  const rows = pitcherRows.slice();
+  rows.sort((a, b) => {
+    if (col.type === "text") {
+      const av = (a[key] || "").toString().toLowerCase();
+      const bv = (b[key] || "").toString().toLowerCase();
+      if (av < bv) return dir === "asc" ? -1 : 1;
+      if (av > bv) return dir === "asc" ? 1 : -1;
+      return 0;
+    }
+    if (col.type === "wl") {
+      // sort by wins
+      const av = parseFloat(a.wins) || 0, bv = parseFloat(b.wins) || 0;
+      return dir === "asc" ? av - bv : bv - av;
+    }
+    let av = a[key] == null ? null : parseFloat(a[key]);
+    let bv = b[key] == null ? null : parseFloat(b[key]);
+    if (av == null || isNaN(av)) av = dir === "asc" ? Infinity : -Infinity;
+    if (bv == null || isNaN(bv)) bv = dir === "asc" ? Infinity : -Infinity;
+    return dir === "asc" ? av - bv : bv - av;
+  });
+  const top = rows.slice(0, 75);
+
+  syncPitchDropdown(which, key, dir);
+
+  const arrow = dir === "desc" ? " ▾" : " ▴";
+  let head = `<tr><th>#</th>`;
+  for (const c of PITCH_COLS) {
+    const on = c.key === key;
+    const smCls = c.sm ? "hide-sm " : "";
+    head += `<th class="${smCls}lead-th${on ? " sort-on" : ""}" data-key="${c.key}">${c.label}${on ? arrow : ""}</th>`;
+  }
+  head += `</tr>`;
+
+  let html = `<table class="lead-table"><thead>${head}</thead><tbody>`;
+  top.forEach((r, i) => {
+    const kPct = r.kRate != null ? (r.kRate * 100).toFixed(1) + "%" : "–";
+    let tds = `<td class="rank-num">${i+1}</td>`;
+    for (const c of PITCH_COLS) {
+      const on = c.key === key;
+      const smCls = c.sm ? "hide-sm" : "";
+      let cell;
+      if (c.key === "name")        cell = `<span class="pname-cell">${r.name}</span>`;
+      else if (c.key === "team")   cell = `<span style="color:var(--accent-2)">${r.team}</span>`;
+      else if (c.key === "wl")     cell = `${r.wins ?? "–"}-${r.losses ?? "–"}`;
+      else if (c.key === "kRate")  cell = kPct;
+      else if (c.type === "rate")  cell = (r[c.key] != null ? r[c.key] : "–");      // ERA/WHIP as given
+      else if (c.type === "rate2") cell = (r[c.key] != null ? r[c.key] : "–");      // K/9 as given
+      else                          cell = (r[c.key] ?? "–");
+      const strong = on && c.type !== "text" ? "num-strong" : "";
+      tds += `<td class="${smCls} ${strong}">${cell}</td>`;
+    }
+    html += `<tr>${tds}</tr>`;
+  });
+  html += `</tbody></table>`;
+  const dirWord = dir === "desc" ? "high→low" : "low→high";
+  html += `<div class="kfoot">Showing top 75 qualified pitchers · click any column header to sort · sorting by <b>${col.label}</b> (${dirWord})</div>`;
+  el.innerHTML = html;
+
+  el.querySelectorAll(".lead-th").forEach(th => {
+    th.onclick = () => sortPitchers(which, th.dataset.key);
+  });
+}
+
+function syncPitchDropdown(which, key, dir) {
+  const sel = document.getElementById(which === "top" ? "topPitchSort" : "worstPitchSort");
+  if (!sel) return;
+  // only set if the option exists in this dropdown
+  if ([...sel.options].some(o => o.value === key)) sel.value = key;
+}
+
+// ========================================================================
+// UNDERPERFORMERS + OVERPERFORMERS: hitters' recent-form over a selectable window
+// ========================================================================
+let slumpRows = null; // cached cold results for current render
+let hotRows = null;   // cached hot results for current render
+let hitWindow = { slumps: 3, hot: 3 }; // games window per tab (3/5/10)
+// Shared cache of the expensive slate scan, keyed by "date|N".
+const slateFormCache = {};
+
+// run async tasks with a concurrency cap + progress callback
+async function runPooled(items, worker, concurrency, onProgress) {
+  const results = [];
+  let idx = 0, done = 0;
+  async function next() {
+    const i = idx++;
+    if (i >= items.length) return;
+    try { results[i] = await worker(items[i], i); }
+    catch (e) { results[i] = null; }
+    done++;
+    if (onProgress) onProgress(done, items.length);
+    return next();
+  }
+  const runners = [];
+  for (let c = 0; c < Math.min(concurrency, items.length); c++) runners.push(next());
+  await Promise.all(runners);
+  return results;
+}
+
+function setScanProgress(targetElId, done, total, label) {
+  const el = document.getElementById(targetElId);
+  if (!el) return;
+  const pct = total ? Math.round((done / total) * 100) : 0;
+  el.innerHTML = `<div class="progress-wrap">${label || "Pulling game logs"} … ${done}/${total}
+    <div class="progress-bar-track"><div class="progress-bar-fill" style="width:${pct}%"></div></div></div>`;
+}
+
+// Shared slate scan: every hitter in the slate with last-N-game AB/H/HR.
+// Cached per "date|N" so hot and cold tabs sharing a window don't double-fetch.
+async function loadSlateForm(dateStr, gamesN, targetElId) {
+  const cacheKey = `${dateStr}|${gamesN}`;
+  if (slateFormCache[cacheKey]) return slateFormCache[cacheKey];
+
+  const season = new Date().getFullYear();
+  // 1) schedule -> unique teams playing that day
+  const sched = await getJSON(`${API}/schedule?sportId=1&date=${dateStr}&hydrate=team`);
+  const dates = sched.dates || [];
+  if (!dates.length || !dates[0].games || !dates[0].games.length) {
+    return { empty: true };
+  }
+  const teamMap = {};
+  for (const g of dates[0].games) {
+    const h = g.teams.home.team, a = g.teams.away.team;
+    teamMap[h.id] = h.abbreviation || h.name;
+    teamMap[a.id] = a.abbreviation || a.name;
+  }
+  const teamIds = Object.keys(teamMap);
+
+  // 2) each team's active position players (+ season AVG for contrast)
+  const tEl = document.getElementById(targetElId);
+  if (tEl) tEl.innerHTML = '<div class="progress-wrap">Loading rosters for ' + teamIds.length + ' teams…<div class="progress-bar-track"><div class="progress-bar-fill" style="width:8%"></div></div></div>';
+  let hitters = [];
+  for (const tid of teamIds) {
+    try {
+      const roster = await getJSON(`${API}/teams/${tid}/roster?rosterType=active&hydrate=person(stats(type=[season],group=[hitting],season=${season}))`);
+      for (const r of roster.roster || []) {
+        if (r.position && r.position.abbreviation === "P") continue;
+        const person = r.person;
+        if (!person) continue;
+        let seasonAvg = null, seasonAB = 0;
+        const st = person.stats?.find(s => (s.group?.displayName === "hitting"))?.splits?.[0]?.stat;
+        if (st) { seasonAvg = st.avg; seasonAB = st.atBats || 0; }
+        hitters.push({ id: person.id, name: person.fullName, team: teamMap[tid], pos: r.position?.abbreviation || "", seasonAvg, seasonAB });
+      }
+    } catch (e) { /* skip team on error */ }
+  }
+  const seen = {};
+  hitters = hitters.filter(h => { if (seen[h.id]) return false; seen[h.id] = 1; return true; });
+  if (!hitters.length) return { empty: true };
+
+  // 3) game logs per hitter (concurrency-capped), take last N games
+  const logged = await runPooled(hitters, async (h) => {
+    const data = await getJSON(`${API}/people/${h.id}/stats?stats=gameLog&group=hitting&season=${season}`);
+    const splits = data.stats?.[0]?.splits || [];
+    const lastN = splits.slice(-gamesN);
+    let ab = 0, hits = 0, hr = 0, games = lastN.length;
+    for (const s of lastN) {
+      const st = s.stat || {};
+      ab += st.atBats || 0;
+      hits += st.hits || 0;
+      hr += st.homeRuns || 0;
+    }
+    return { ...h, ab, hits, hr, games, avg3: ab > 0 ? hits / ab : 0 };
+  }, 6, (done, total) => setScanProgress(targetElId, done, total, `Pulling last-${gamesN}-game logs`));
+
+  // minimum AB scales with window (~2 AB/game): 1 for last game, 6 for 3 games, 10 for 5, 20 for 10
+  const minAB = gamesN === 1 ? 1 : Math.max(4, Math.round(gamesN * 2));
+  const all = logged.filter(Boolean).filter(h => h.games >= 1 && h.ab >= minAB);
+  slateFormCache[cacheKey] = { rows: all, gamesN, minAB };
+  return slateFormCache[cacheKey];
+}
+
+async function loadSlumps(dateStr) {
+  const el = document.getElementById("slumpContent");
+  const gamesN = hitWindow.slumps;
+  el.innerHTML = '<div class="status-msg"><div class="spinner"></div>Loading slate…</div>';
+  try {
+    const data = await loadSlateForm(dateStr, gamesN, "slumpContent");
+    if (data.empty) {
+      el.innerHTML = '<div class="status-msg">No MLB games scheduled for <strong>' + dateStr + '</strong>. Try another date.</div>';
+      return;
+    }
+    // cold: avg <= .220 over the window
+    slumpRows = data.rows.filter(h => h.avg3 <= 0.220);
+    slumpRows._meta = { gamesN: data.gamesN, minAB: data.minAB };
+    if (!slumpRows.length) {
+      el.innerHTML = `<div class="status-msg">No qualifying cold hitters in this slate — everyone with enough at-bats is hitting above .220 over their last ${gamesN} games.</div>`;
+      return;
+    }
+    renderSlumps();
+    stampTime();
+  } catch (e) {
+    el.innerHTML = '<div class="status-msg err">Could not analyze slate: ' + e.message + '</div>';
+  }
+}
+
+async function loadHot(dateStr) {
+  const el = document.getElementById("hotContent");
+  const gamesN = hitWindow.hot;
+  el.innerHTML = '<div class="status-msg"><div class="spinner"></div>Loading slate…</div>';
+  try {
+    const data = await loadSlateForm(dateStr, gamesN, "hotContent");
+    if (data.empty) {
+      el.innerHTML = '<div class="status-msg">No MLB games scheduled for <strong>' + dateStr + '</strong>. Try another date.</div>';
+      return;
+    }
+    // hot: avg >= .300 over the window
+    hotRows = data.rows.filter(h => h.avg3 >= 0.300);
+    hotRows._meta = { gamesN: data.gamesN, minAB: data.minAB };
+    if (!hotRows.length) {
+      el.innerHTML = `<div class="status-msg">No qualifying hot hitters in this slate — nobody with enough at-bats is hitting .300+ over their last ${gamesN} games.</div>`;
+      return;
+    }
+    renderHot();
+    stampTime();
+  } catch (e) {
+    el.innerHTML = '<div class="status-msg err">Could not analyze slate: ' + e.message + '</div>';
+  }
+}
+
+function slumpBucket(avg3, hits) {
+  if (hits === 0) return { key: "ice",   label: "ICE COLD", cls: "t-ice",   order: 0 };
+  if (avg3 < 0.150) return { key: "slump", label: "SLUMPING", cls: "t-slump", order: 1 };
+  return { key: "cool", label: "COOLING", cls: "t-cool", order: 2 };
+}
+
+function renderSlumps() {
+  if (!slumpRows) return;
+  const el = document.getElementById("slumpContent");
+  const sortKey = document.getElementById("slumpSort").value;
+
+  // attach buckets
+  const rows = slumpRows.map(h => ({ ...h, bucket: slumpBucket(h.avg3, h.hits) }));
+  const N = (slumpRows._meta && slumpRows._meta.gamesN) || 3;
+  const minAB = (slumpRows._meta && slumpRows._meta.minAB) || 6;
+  const winPhrase = N === 1 ? "last game" : `last ${N} games`;   // "last game" / "last 5 games"
+  const avgLabel = N === 1 ? "Game AVG" : `${N}-Game AVG`;
+
+  // sort within: by bucket order first, then chosen metric
+  rows.sort((a, b) => {
+    if (a.bucket.order !== b.bucket.order) return a.bucket.order - b.bucket.order;
+    if (sortKey === "ab3") return b.ab - a.ab;       // most at-bats wasted
+    if (sortKey === "hr3") return a.hr - b.hr;        // fewest HR first
+    return a.avg3 - b.avg3;                            // coldest first (default)
+  });
+
+  // group by bucket for readability
+  const groups = [
+    { key: "ice",   title: "🧊 Ice Cold", desc: `0 hits over ${winPhrase}` },
+    { key: "slump", title: "❄️ Slumping", desc: "under .150" },
+    { key: "cool",  title: "🌡️ Cooling",  desc: ".150–.220" },
+  ];
+
+  let html = "";
+  for (const g of groups) {
+    const groupRows = rows.filter(r => r.bucket.key === g.key);
+    if (!groupRows.length) continue;
+    html += `<div class="slump-group-head">${g.title} <span class="slump-count">${groupRows.length} hitter${groupRows.length>1?"s":""} · ${g.desc}</span></div>`;
+    html += `<table class="lead-table"><thead><tr>
+      <th>Hitter</th><th>Team</th><th title="At-bats over ${winPhrase}">AB</th>
+      <th title="Hits over ${winPhrase}">H</th><th title="Home runs over ${winPhrase}">HR</th>
+      <th>${avgLabel}</th><th class="hide-sm" title="Season average for contrast">SznAVG</th>
+    </tr></thead><tbody>`;
+    for (const r of groupRows) {
+      html += `<tr>
+        <td class="pname-cell">${r.name}<span class="pos">${r.pos}</span></td>
+        <td style="color:var(--accent-2)">${r.team}</td>
+        <td>${r.ab}</td>
+        <td>${r.hits}</td>
+        <td>${r.hr}</td>
+        <td class="num-strong">${fmt3(r.avg3)}</td>
+        <td class="hide-sm">${fmt3(r.seasonAvg)}</td>
+      </tr>`;
+    }
+    html += `</tbody></table>`;
+  }
+  html += `<div class="kfoot">Cold hitters from today's slate · ${winPhrase} each · ${minAB}+ AB minimum · sorted within each group</div>`;
+  el.innerHTML = html;
+}
+
+// ---- OVERPERFORMERS (hot) ----
+function hotBucket(avg3, hr) {
+  // Scorching: .400+ or multiple HR in the window; On Fire: .350+; Heating Up: .300-.350
+  if (avg3 >= 0.400 || hr >= 2) return { key: "scorch", label: "SCORCHING", cls: "t-scorch", order: 0 };
+  if (avg3 >= 0.350) return { key: "fire", label: "ON FIRE", cls: "t-fire", order: 1 };
+  return { key: "heat", label: "HEATING UP", cls: "t-heat", order: 2 };
+}
+
+function renderHot() {
+  if (!hotRows) return;
+  const el = document.getElementById("hotContent");
+  const sortKey = document.getElementById("hotSort").value;
+
+  const rows = hotRows.map(h => ({ ...h, bucket: hotBucket(h.avg3, h.hr) }));
+  const N = (hotRows._meta && hotRows._meta.gamesN) || 3;
+  const minAB = (hotRows._meta && hotRows._meta.minAB) || 6;
+  const winPhrase = N === 1 ? "last game" : `last ${N} games`;
+  const avgLabel = N === 1 ? "Game AVG" : `${N}-Game AVG`;
+  rows.sort((a, b) => {
+    if (a.bucket.order !== b.bucket.order) return a.bucket.order - b.bucket.order;
+    if (sortKey === "ab3") return b.ab - a.ab;       // most at-bats (busiest hot bats)
+    if (sortKey === "hr3") return b.hr - a.hr;        // most HR first
+    return b.avg3 - a.avg3;                            // hottest first (default)
+  });
+
+  const groups = [
+    { key: "scorch", title: "🔥 Scorching", desc: ".400+ or 2+ HR" },
+    { key: "fire",   title: "🌶️ On Fire",   desc: ".350–.400" },
+    { key: "heat",   title: "📈 Heating Up", desc: ".300–.350" },
+  ];
+
+  let html = "";
+  for (const g of groups) {
+    const groupRows = rows.filter(r => r.bucket.key === g.key);
+    if (!groupRows.length) continue;
+    html += `<div class="slump-group-head">${g.title} <span class="slump-count">${groupRows.length} hitter${groupRows.length>1?"s":""} · ${g.desc}</span></div>`;
+    html += `<table class="lead-table"><thead><tr>
+      <th>Hitter</th><th>Team</th><th title="At-bats over ${winPhrase}">AB</th>
+      <th title="Hits over ${winPhrase}">H</th><th title="Home runs over ${winPhrase}">HR</th>
+      <th>${avgLabel}</th><th class="hide-sm" title="Season average for contrast">SznAVG</th>
+    </tr></thead><tbody>`;
+    for (const r of groupRows) {
+      const hrCell = (r.hr||0) > 0 ? `<span class="hr-badge">${r.hr}</span>` : '0';
+      html += `<tr>
+        <td class="pname-cell">${r.name}<span class="pos">${r.pos}</span></td>
+        <td style="color:var(--accent-2)">${r.team}</td>
+        <td>${r.ab}</td>
+        <td>${r.hits}</td>
+        <td>${hrCell}</td>
+        <td class="num-strong">${fmt3(r.avg3)}</td>
+        <td class="hide-sm">${fmt3(r.seasonAvg)}</td>
+      </tr>`;
+    }
+    html += `</tbody></table>`;
+  }
+  html += `<div class="kfoot">Hot hitters from today's slate · ${winPhrase} each · ${minAB}+ AB minimum · sorted within each group</div>`;
+  el.innerHTML = html;
+}
+
+// ========================================================================
+// PITCHER FORM: heating / cooling over a selectable appearance window
+// ========================================================================
+let heatingPitchRows = null;
+let coolingPitchRows = null;
+let pitchWindow = { heatpitch: 3, coolpitch: 3 }; // appearances window per tab
+const pitcherFormCache = {};
+
+// MLB innings-pitched strings use .1 / .2 to mean 1/3, 2/3 of an inning (i.e. outs).
+// Must convert to outs before summing across games, or ERA/WHIP/K9 come out wrong.
+function ipToOuts(ip) {
+  if (ip == null) return 0;
+  const n = parseFloat(ip);
+  if (isNaN(n)) return 0;
+  const whole = Math.floor(n);
+  const frac = Math.round((n - whole) * 10); // 0, 1, or 2 outs
+  return whole * 3 + (frac >= 1 ? frac : 0);
+}
+function outsToIp(outs) {
+  const whole = Math.floor(outs / 3);
+  const rem = outs % 3;
+  return `${whole}.${rem}`;
+}
+function fmtRate2(v) {
+  if (v == null) return "–";
+  if (!isFinite(v)) return "∞";
+  return v.toFixed(2);
+}
+
+// Shared slate scan for pitchers: every pitcher in the slate with last-N-appearance
+// totals + derived ERA/WHIP/K9. Cached per "date|N" so tabs sharing a window share data.
+async function loadPitcherSlateForm(dateStr, gamesN, targetElId) {
+  const cacheKey = `${dateStr}|${gamesN}`;
+  if (pitcherFormCache[cacheKey]) return pitcherFormCache[cacheKey];
+  const season = new Date().getFullYear();
+  const sched = await getJSON(`${API}/schedule?sportId=1&date=${dateStr}&hydrate=team`);
+  const dates = sched.dates || [];
+  if (!dates.length || !dates[0].games || !dates[0].games.length) return { empty: true };
+  const teamMap = {};
+  for (const g of dates[0].games) {
+    const h = g.teams.home.team, a = g.teams.away.team;
+    teamMap[h.id] = h.abbreviation || h.name;
+    teamMap[a.id] = a.abbreviation || a.name;
+  }
+  const teamIds = Object.keys(teamMap);
+  const tEl = document.getElementById(targetElId);
+  if (tEl) tEl.innerHTML = '<div class="progress-wrap">Loading staffs for ' + teamIds.length + ' teams…<div class="progress-bar-track"><div class="progress-bar-fill" style="width:8%"></div></div></div>';
+
+  let pitchers = [];
+  for (const tid of teamIds) {
+    try {
+      const roster = await getJSON(`${API}/teams/${tid}/roster?rosterType=active&hydrate=person(stats(type=[season],group=[pitching],season=${season}))`);
+      for (const r of roster.roster || []) {
+        if (!r.position || r.position.abbreviation !== "P") continue;
+        const person = r.person;
+        if (!person) continue;
+        let seasonEra = null;
+        const st = person.stats?.find(s => (s.group?.displayName === "pitching"))?.splits?.[0]?.stat;
+        if (st) seasonEra = st.era;
+        pitchers.push({ id: person.id, name: person.fullName, team: teamMap[tid], seasonEra });
+      }
+    } catch (e) { /* skip team on error */ }
+  }
+  const seen = {};
+  pitchers = pitchers.filter(p => { if (seen[p.id]) return false; seen[p.id] = 1; return true; });
+  if (!pitchers.length) return { empty: true };
+
+  const logged = await runPooled(pitchers, async (p) => {
+    const data = await getJSON(`${API}/people/${p.id}/stats?stats=gameLog&group=pitching&season=${season}`);
+    const splits = data.stats?.[0]?.splits || [];
+    const lastN = splits.slice(-gamesN);
+    let outs = 0, h = 0, bb = 0, k = 0, hr = 0, er = 0, g = lastN.length;
+    for (const s of lastN) {
+      const st = s.stat || {};
+      outs += ipToOuts(st.inningsPitched);
+      h += st.hits || 0;
+      bb += st.baseOnBalls || 0;
+      k += st.strikeOuts || 0;
+      hr += st.homeRuns || 0;
+      er += st.earnedRuns || 0;
+    }
+    const era3  = outs > 0 ? (er * 27 / outs) : null;
+    const whip3 = outs > 0 ? ((h + bb) * 3 / outs) : null;
+    const k9    = outs > 0 ? (k * 27 / outs) : null;
+    const kbb   = bb > 0 ? (k / bb) : (k > 0 ? Infinity : null);
+    return { ...p, g, outs, ip: outsToIp(outs), h, bb, k, hr, er, br: h + bb, era3, whip3, k9, kbb };
+  }, 6, (done, total) => setScanProgress(targetElId, done, total, `Pulling last-${gamesN}-appearance logs`));
+
+  // minimum outs scales with window: 3 outs (1 IP) for last game, 9 (3 IP) for 3 apps, 15 for 5, 30 for 10
+  const minOuts = gamesN === 1 ? 3 : Math.max(6, gamesN * 3);
+  const all = logged.filter(Boolean).filter(p => p.g >= 1 && p.outs >= minOuts);
+  pitcherFormCache[cacheKey] = { rows: all, gamesN, minIp: outsToIp(minOuts) };
+  return pitcherFormCache[cacheKey];
+}
+
+async function loadHeatingPitchers(dateStr) {
+  const el = document.getElementById("heatPitchContent");
+  const gamesN = pitchWindow.heatpitch;
+  el.innerHTML = '<div class="status-msg"><div class="spinner"></div>Loading slate…</div>';
+  try {
+    const data = await loadPitcherSlateForm(dateStr, gamesN, "heatPitchContent");
+    if (data.empty) { el.innerHTML = '<div class="status-msg">No MLB games scheduled for <strong>' + dateStr + '</strong>. Try another date.</div>'; return; }
+    heatingPitchRows = data.rows.filter(p => p.era3 != null && p.era3 <= 3.75);
+    heatingPitchRows._meta = { gamesN: data.gamesN, minIp: data.minIp };
+    if (!heatingPitchRows.length) { el.innerHTML = `<div class="status-msg">No qualifying hot pitchers in this slate — nobody with enough recent innings is under a 3.75 ERA over their last ${gamesN} appearances.</div>`; return; }
+    renderPitcherForm("heating");
+    stampTime();
+  } catch (e) { el.innerHTML = '<div class="status-msg err">Could not analyze slate: ' + e.message + '</div>'; }
+}
+
+async function loadCoolingPitchers(dateStr) {
+  const el = document.getElementById("coolPitchContent");
+  const gamesN = pitchWindow.coolpitch;
+  el.innerHTML = '<div class="status-msg"><div class="spinner"></div>Loading slate…</div>';
+  try {
+    const data = await loadPitcherSlateForm(dateStr, gamesN, "coolPitchContent");
+    if (data.empty) { el.innerHTML = '<div class="status-msg">No MLB games scheduled for <strong>' + dateStr + '</strong>. Try another date.</div>'; return; }
+    coolingPitchRows = data.rows.filter(p => p.era3 != null && p.era3 >= 4.50);
+    coolingPitchRows._meta = { gamesN: data.gamesN, minIp: data.minIp };
+    if (!coolingPitchRows.length) { el.innerHTML = `<div class="status-msg">No qualifying cold pitchers in this slate — everyone with enough recent innings has an ERA under 4.50 over their last ${gamesN} appearances.</div>`; return; }
+    renderPitcherForm("cooling");
+    stampTime();
+  } catch (e) { el.innerHTML = '<div class="status-msg err">Could not analyze slate: ' + e.message + '</div>'; }
+}
+
+function heatPitchBucket(era3) {
+  if (era3 < 1.50) return { key: "deal",   label: "DEALING", order: 0 };
+  if (era3 < 3.00) return { key: "sharp",  label: "SHARP",   order: 1 };
+  return { key: "steady", label: "STEADY", order: 2 };
+}
+function coolPitchBucket(era3) {
+  if (era3 >= 7.00) return { key: "shell",    label: "SHELLED",    order: 0 };
+  if (era3 >= 5.50) return { key: "struggle", label: "STRUGGLING", order: 1 };
+  return { key: "slip", label: "SLIPPING", order: 2 };
+}
+
+function renderPitcherForm(which) {
+  const heating = which === "heating";
+  const rows0 = heating ? heatingPitchRows : coolingPitchRows;
+  if (!rows0) return;
+  const elId = heating ? "heatPitchContent" : "coolPitchContent";
+  const el = document.getElementById(elId);
+  const sortKey = document.getElementById(heating ? "heatPitchSort" : "coolPitchSort").value;
+
+  const rows = rows0.map(p => ({ ...p, bucket: heating ? heatPitchBucket(p.era3) : coolPitchBucket(p.era3) }));
+  const N = (rows0._meta && rows0._meta.gamesN) || 3;
+  const minIp = (rows0._meta && rows0._meta.minIp) || "3.0";
+  const winPhrase = N === 1 ? "last appearance" : `last ${N} appearances`;
+  rows.sort((a, b) => {
+    if (a.bucket.order !== b.bucket.order) return a.bucket.order - b.bucket.order;
+    switch (sortKey) {
+      case "k":     return heating ? (b.k - a.k) : (a.k - b.k);        // heating: most K; cooling: fewest K
+      case "k9":    return (b.k9 || 0) - (a.k9 || 0);
+      case "whip3": return (a.whip3 || 0) - (b.whip3 || 0);            // lower better
+      case "kbb":   return (b.kbb || 0) - (a.kbb || 0);
+      case "h":     return b.h - a.h;                                   // most hits allowed
+      case "br":    return b.br - a.br;                                 // most baserunners
+      case "hr":    return b.hr - a.hr;                                 // most HR allowed
+      default:      return heating ? ((a.era3 || 0) - (b.era3 || 0)) : ((b.era3 || 0) - (a.era3 || 0));
+    }
+  });
+
+  const groups = heating
+    ? [ {key:"deal",title:"🚀 Dealing",desc:"sub-1.50 ERA"}, {key:"sharp",title:"✨ Sharp",desc:"1.50–3.00"}, {key:"steady",title:"🎟️ Steady",desc:"3.00–3.75"} ]
+    : [ {key:"shell",title:"💥 Getting Shelled",desc:"7.00+ ERA"}, {key:"struggle",title:"🧯 Struggling",desc:"5.50–7.00"}, {key:"slip",title:"📉 Slipping",desc:"4.50–5.50"} ];
+
+  let html = "";
+  for (const g of groups) {
+    const gr = rows.filter(r => r.bucket.key === g.key);
+    if (!gr.length) continue;
+    html += `<div class="slump-group-head">${g.title} <span class="slump-count">${gr.length} pitcher${gr.length>1?"s":""} · ${g.desc}</span></div>`;
+    html += `<table class="lead-table"><thead><tr>
+      <th>Pitcher</th><th>Team</th>
+      <th title="Innings pitched, ${winPhrase}">IP</th>
+      <th title="Hits allowed">H</th>
+      <th class="hide-sm" title="Walks allowed">BB</th>
+      <th title="Strikeouts">K</th>
+      <th class="hide-sm" title="Home runs allowed">HR</th>
+      <th title="Walks + hits per inning pitched">WHIP</th>
+      <th class="hide-sm" title="Strikeouts per 9 innings">K/9</th>
+      <th title="Earned run average over the window">ERA</th>
+      <th class="hide-sm" title="Season ERA for contrast">SznERA</th>
+    </tr></thead><tbody>`;
+    for (const r of gr) {
+      const hrCell = (r.hr||0) > 0 ? `<span class="hr-badge">${r.hr}</span>` : '0';
+      html += `<tr>
+        <td class="pname-cell">${r.name}</td>
+        <td style="color:var(--accent-2)">${r.team}</td>
+        <td>${r.ip}</td>
+        <td>${r.h}</td>
+        <td class="hide-sm">${r.bb}</td>
+        <td class="num-strong">${r.k}</td>
+        <td class="hide-sm">${hrCell}</td>
+        <td>${fmtRate2(r.whip3)}</td>
+        <td class="hide-sm">${fmtRate2(r.k9)}</td>
+        <td class="num-strong">${fmtRate2(r.era3)}</td>
+        <td class="hide-sm">${r.seasonEra != null ? r.seasonEra : "–"}</td>
+      </tr>`;
+    }
+    html += `</tbody></table>`;
+  }
+  const noun = heating ? "Hot" : "Cold";
+  html += `<div class="kfoot">${noun} pitchers from today's slate · ${winPhrase} each · ${minIp}+ IP minimum · sorted within each group</div>`;
+  el.innerHTML = html;
+}
+
+// ========================================================================
+// TAB SWITCHING (eight tabs)
+// ========================================================================
+const TABS = {
+  matchups:       { tab: "tabMatchups",       view: "view-matchups" },
+  picks:          { tab: "tabPicks",            view: "view-picks" },
+  targets:        { tab: "tabTargets",          view: "view-targets" },
+  leaders:        { tab: "tabLeaders",         view: "view-leaders" },
+  toppitchers:    { tab: "tabTopPitchers",     view: "view-toppitchers" },
+  worstpitchers:  { tab: "tabWorstPitchers",   view: "view-worstpitchers" },
+  hot:            { tab: "tabHot",              view: "view-hot" },
+  slumps:         { tab: "tabSlumps",           view: "view-slumps" },
+  heatpitch:      { tab: "tabHeatPitch",        view: "view-heatpitch" },
+  coolpitch:      { tab: "tabCoolPitch",        view: "view-coolpitch" },
+};
+let leadersLoaded = false;
+let pitchersLoaded = false;
+let slumpsLoaded = false;
+let hotLoaded = false;
+let heatPitchLoaded = false;
+let coolPitchLoaded = false;
+let picksLoaded = false;
+let targetsLoaded = false;
+
+function showTab(which) {
+  for (const [name, ids] of Object.entries(TABS)) {
+    const tabEl = document.getElementById(ids.tab);
+    const viewEl = document.getElementById(ids.view);
+    const active = name === which;
+    if (viewEl) viewEl.style.display = active ? "" : "none";
+    if (tabEl) tabEl.classList.toggle("tab-active", active);
+  }
+  // lazy-load data the first time a tab is opened
+  if (which === "leaders" && !leadersLoaded) { leadersLoaded = true; loadLeaders(); }
+  if (which === "picks" && !picksLoaded) {
+    picksLoaded = true;
+    const pd = document.getElementById("picksDate");
+    if (pd && !pd.value) pd.value = document.getElementById("datePick").value;
+    loadPicks(pd.value);
+  }
+  if (which === "targets" && !targetsLoaded) {
+    targetsLoaded = true;
+    const td = document.getElementById("targetsDate");
+    if (td && !td.value) td.value = document.getElementById("datePick").value;
+    loadTargets(td.value, document.getElementById("targetsWindow").value);
+  }
+  if ((which === "toppitchers" || which === "worstpitchers") && !pitchersLoaded) {
+    pitchersLoaded = true; loadPitchers();
+  }
+  if (which === "slumps" && !slumpsLoaded) {
+    slumpsLoaded = true;
+    const sd = document.getElementById("slumpDate");
+    if (sd && !sd.value) sd.value = document.getElementById("datePick").value;
+    loadSlumps(sd.value);
+  }
+  if (which === "hot" && !hotLoaded) {
+    hotLoaded = true;
+    const hd = document.getElementById("hotDate");
+    if (hd && !hd.value) hd.value = document.getElementById("datePick").value;
+    loadHot(hd.value);
+  }
+  if (which === "heatpitch" && !heatPitchLoaded) {
+    heatPitchLoaded = true;
+    const hp = document.getElementById("heatPitchDate");
+    if (hp && !hp.value) hp.value = document.getElementById("datePick").value;
+    loadHeatingPitchers(hp.value);
+  }
+  if (which === "coolpitch" && !coolPitchLoaded) {
+    coolPitchLoaded = true;
+    const cp = document.getElementById("coolPitchDate");
+    if (cp && !cp.value) cp.value = document.getElementById("datePick").value;
+    loadCoolingPitchers(cp.value);
+  }
+}
+
+// ---------- wire up controls ----------
+const datePick = document.getElementById("datePick");
+datePick.value = ymd(new Date());
+
+document.getElementById("loadBtn").onclick = () => loadSlate(datePick.value);
+document.getElementById("todayBtn").onclick = () => { datePick.value = ymd(new Date()); loadSlate(datePick.value); };
+document.getElementById("tmrwBtn").onclick = () => {
+  const d = new Date(); d.setDate(d.getDate()+1);
+  datePick.value = ymd(d); loadSlate(datePick.value);
+};
+
+document.getElementById("tabMatchups").onclick = () => showTab("matchups");
+document.getElementById("tabPicks").onclick = () => showTab("picks");
+document.getElementById("tabTargets").onclick = () => showTab("targets");
+document.getElementById("tabLeaders").onclick = () => showTab("leaders");
+document.getElementById("tabTopPitchers").onclick = () => showTab("toppitchers");
+document.getElementById("tabWorstPitchers").onclick = () => showTab("worstpitchers");
+document.getElementById("tabHot").onclick = () => showTab("hot");
+document.getElementById("tabSlumps").onclick = () => showTab("slumps");
+document.getElementById("tabHeatPitch").onclick = () => showTab("heatpitch");
+document.getElementById("tabCoolPitch").onclick = () => showTab("coolpitch");
+
+document.getElementById("leadersBtn").onclick = () => loadLeaders();
+document.getElementById("sortPick").onchange = (e) => {
+  const v = e.target.value;
+  if (v === "krateLow") { leaderSort = { key: "kRate", dir: "asc" }; }
+  else { leaderSort = { key: v, dir: "desc" }; }
+  renderLeaders();
+};
+
+// pitcher tab controls
+document.getElementById("topPitchBtn").onclick = () => loadPitchers();
+document.getElementById("worstPitchBtn").onclick = () => loadPitchers();
+document.getElementById("topPitchSort").onchange = (e) => {
+  const v = e.target.value;
+  // ERA/WHIP lower is better -> asc; everything else higher -> desc
+  pitchSort.top = { key: v, dir: (v === "era" || v === "whip") ? "asc" : "desc" };
+  renderPitchers("top");
+};
+document.getElementById("worstPitchSort").onchange = (e) => {
+  const v = e.target.value;
+  // worst tab: all these sorts want the WORST first -> desc (higher = worse)
+  pitchSort.worst = { key: v, dir: "desc" };
+  renderPitchers("worst");
+};
+
+// underperformers controls
+const slumpDate = document.getElementById("slumpDate");
+slumpDate.value = ymd(new Date());
+document.getElementById("slumpBtn").onclick = () => loadSlumps(slumpDate.value);
+document.getElementById("slumpSort").onchange = () => { if (slumpRows) renderSlumps(); };
+document.getElementById("slumpWindow").onchange = (e) => { hitWindow.slumps = parseInt(e.target.value, 10); loadSlumps(slumpDate.value); };
+
+// overperformers controls
+const hotDate = document.getElementById("hotDate");
+hotDate.value = ymd(new Date());
+document.getElementById("hotBtn").onclick = () => loadHot(hotDate.value);
+document.getElementById("hotSort").onchange = () => { if (hotRows) renderHot(); };
+document.getElementById("hotWindow").onchange = (e) => { hitWindow.hot = parseInt(e.target.value, 10); loadHot(hotDate.value); };
+
+// heating pitchers controls
+const heatPitchDate = document.getElementById("heatPitchDate");
+heatPitchDate.value = ymd(new Date());
+document.getElementById("heatPitchBtn").onclick = () => loadHeatingPitchers(heatPitchDate.value);
+document.getElementById("heatPitchSort").onchange = () => { if (heatingPitchRows) renderPitcherForm("heating"); };
+document.getElementById("heatPitchWindow").onchange = (e) => { pitchWindow.heatpitch = parseInt(e.target.value, 10); loadHeatingPitchers(heatPitchDate.value); };
+
+// cooling pitchers controls
+const coolPitchDate = document.getElementById("coolPitchDate");
+coolPitchDate.value = ymd(new Date());
+document.getElementById("coolPitchBtn").onclick = () => loadCoolingPitchers(coolPitchDate.value);
+document.getElementById("coolPitchSort").onchange = () => { if (coolingPitchRows) renderPitcherForm("cooling"); };
+document.getElementById("coolPitchWindow").onchange = (e) => { pitchWindow.coolpitch = parseInt(e.target.value, 10); loadCoolingPitchers(coolPitchDate.value); };
+
+// top hitter picks controls
+const picksDate = document.getElementById("picksDate");
+picksDate.value = ymd(new Date());
+document.getElementById("picksBtn").onclick = () => loadPicks(picksDate.value);
+document.getElementById("picksCount").onchange = () => { if (pickRows) renderPicks(); };
+document.getElementById("pickType").onchange = () => { if (pickRows) renderPicks(); };
+
+// matchup targets controls
+const targetsDate = document.getElementById("targetsDate");
+targetsDate.value = ymd(new Date());
+document.getElementById("targetsBtn").onclick = () => loadTargets(targetsDate.value, document.getElementById("targetsWindow").value);
+document.getElementById("targetsWindow").onchange = () => loadTargets(targetsDate.value, document.getElementById("targetsWindow").value);
+
+// auto-load on open
+loadSlate(datePick.value);
+</script>
+</body>
+</html>
