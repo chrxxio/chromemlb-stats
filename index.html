@@ -285,6 +285,7 @@
     font-size: 11px;
   }
   .num-strong { color: var(--accent); font-weight: 700; }
+  .tlogo { vertical-align: -4px; margin-right: 5px; display: inline-block; flex-shrink: 0; }
   .kchance { font-weight: 700; white-space: nowrap; }
   .kproj { font-weight: 400; color: var(--muted); font-size: 11px; }
   .kc-high { color: var(--red); }
@@ -360,33 +361,37 @@
 <div class="legend">
   <b>How to read this:</b> Each game lists the probable starting pitchers with a
   <b>rating</b> from their ERA + WHIP (<span style="color:var(--green)">Tough</span>,
-  <span style="color:var(--accent)">Average</span>, <span style="color:var(--red)">Soft</span>) plus their
-  <b>K%</b> (strikeout rate). Below, each team's <b>top 6 hitters</b> are ranked by a blend of season
-  OPS and <b>recent form</b> (last 15 days). Columns: <b>SO</b> = season strikeouts, <b>K%</b> = the
-  hitter's own strikeout rate, and <b>K&nbsp;Chance</b> = estimated strikeout chance <i>against that game's
-  opposing starter</i>, shown as % per plate appearance with projected total Ks in parentheses.
-  K&nbsp;Chance colors: <span style="color:var(--red)">high</span> /
-  <span style="color:var(--accent)">medium</span> / <span style="color:var(--green)">low</span>.
+  <span style="color:var(--accent)">Average</span>, <span style="color:var(--red)">Soft</span>), their
+  <b>K%</b>, their <b>BAA</b> (opponents' batting average), and <b>~IP/st</b> — how deep into games they
+  usually pitch. Below, each team shows the <b>hitters most likely to get a hit off that game's opposing
+  starter</b>, drawn from the 26-man active roster (injured-list players excluded) and ranked by
+  <b>Hit&nbsp;Chance</b>: the odds of at least one hit, combining the batter's AVG with the pitcher's BAA
+  over the at-bats the starter's typical outing length allows (a 6-inning starter gives each hitter more
+  cracks than a 4-inning one). <b>K&nbsp;Chance</b> = strikeout risk vs that same starter (% per PA,
+  projected Ks in parentheses). Colors: <span style="color:var(--green)">green good for the batter</span> /
+  <span style="color:var(--accent)">medium</span> / <span style="color:var(--red)">red bad</span>.
   A <span class="hot-flag">HOT</span> flag means batting .300+ over the last 15 days. When no starter is
-  posted yet, K&nbsp;Chance is estimated vs a league-average pitcher and marked with <span class="kavg">*</span>.
-  <br><span style="color:var(--muted)">K Chance uses the standard matchup formula: (batter K% × pitcher K%) ÷ league&nbsp;K% (~22%). It's an estimate, not a guarantee.</span>
+  posted yet, both estimates use a league-average pitcher and are marked with <span class="kavg">*</span>.
+  <br><span style="color:var(--muted)">Hit Chance formula: per-AB p = (batter AVG × pitcher BAA) ÷ league AVG (~.245); expected AB from IP/start × batters-per-inning ÷ 9 spots; P(≥1 hit) = 1 − (1−p)^AB. Estimates, not guarantees.</span>
 </div>
 
 <div class="abbr-key">
   <div class="abbr-key-title">Abbreviations</div>
   <div class="abbr-grid">
     <div><b>AVG</b> Batting average</div>
+    <div><b>Hit Chance</b> Odds of ≥1 hit vs. opposing starter</div>
+    <div><b>K Chance</b> Est. strikeout chance vs. opposing starter</div>
     <div><b>OPS</b> On-base + slugging</div>
     <div><b>SO</b> Strikeouts (season)</div>
     <div><b>K%</b> Strikeout rate (SO ÷ PA)</div>
-    <div><b>K Chance</b> Est. strikeout chance vs. opposing starter</div>
     <div><b>HR 15d</b> Home runs, last 15 days</div>
     <div><b>SP</b> Starting pitcher</div>
+    <div><b>BAA</b> Opponents' batting average vs. pitcher</div>
+    <div><b>~IP/st</b> Average innings per start</div>
     <div><b>ERA</b> Earned run average</div>
     <div><b>WHIP</b> Walks + hits per inning</div>
     <div><b>K/9</b> Strikeouts per 9 innings</div>
     <div><b>HOT</b> Batting .300+ over last 15 days</div>
-    <div><b>PA</b> Plate appearances</div>
   </div>
 </div>
 
@@ -869,6 +874,57 @@ function kChanceClass(prob) {
   return "kc-low";
 }
 
+// ---------- hit-likelihood math (who's most likely to get a hit vs this starter) ----------
+// League anchors (recent-MLB baselines): league batting average ~.245; starters average ~5.2 IP/start.
+const LEAGUE_AVG = 0.245;
+const LEAGUE_IP_PER_START = 5.2;
+
+// Per-AB hit probability for this batter vs this pitcher (same odds-ratio method as K Chance):
+//   p(hit per AB) = (batterAVG * pitcherBAA) / leagueAVG
+// where BAA = the pitcher's opponents' batting average (hits allowed / at-bats faced).
+function matchupHitProb(batterAvg, pitcherBaa) {
+  if (batterAvg == null || pitcherBaa == null) return null;
+  let p = (batterAvg * pitcherBaa) / LEAGUE_AVG;
+  if (p > 0.60) p = 0.60;
+  if (p < 0.05) p = 0.05;
+  return p;
+}
+
+// Expected AT-BATS a lineup regular gets vs the starter, driven by how deep the starter
+// usually goes: batters faced per start ≈ IP/start × (3 outs + WHIP baserunners) per inning,
+// split across 9 lineup spots, then ~11% of PAs removed (walks/HBP) to land on ABs.
+function expectedAbVsStarter(ipPerStart, whip) {
+  const ip = (ipPerStart != null && ipPerStart > 0) ? ipPerStart : LEAGUE_IP_PER_START;
+  const w = (whip != null && whip > 0) ? whip : 1.30;
+  const paPerSpot = ip * (3 + w) / 9;
+  return paPerSpot * 0.89;
+}
+
+// Probability of AT LEAST ONE hit across n expected at-bats.
+function atLeastOneHit(pPerAb, nAb) {
+  if (pPerAb == null || nAb == null || nAb <= 0) return null;
+  return 1 - Math.pow(1 - pPerAb, nAb);
+}
+
+function hitChanceClass(prob) {
+  if (prob == null) return "kc-na";
+  if (prob >= 0.62) return "kc-low";   // green: strong chance to hit (good for the batter)
+  if (prob >= 0.50) return "kc-med";
+  return "kc-high";                     // red: unlikely to hit
+}
+
+// ---------- team logos (official MLB static assets, by team id) ----------
+// Primary set: https://www.mlbstatic.com/team-logos/{id}.svg
+// Dark-background cap set: https://www.mlbstatic.com/team-logos/team-cap-on-dark/{id}.svg
+// Falls back cap-on-dark -> primary -> hidden, so a missing asset never breaks layout.
+function teamLogo(teamId, size) {
+  if (!teamId) return "";
+  const px = size || 18;
+  return `<img class="tlogo" style="width:${px}px;height:${px}px" alt="" loading="lazy"
+    src="https://www.mlbstatic.com/team-logos/team-cap-on-dark/${teamId}.svg"
+    onerror="if(!this.dataset.f){this.dataset.f=1;this.src='https://www.mlbstatic.com/team-logos/${teamId}.svg'}else{this.style.display='none'}">`;
+}
+
 // ---------- pitcher rating from ERA + WHIP ----------
 function ratePitcher(era, whip) {
   // lower is better. Compose a 0-100 "hittability" score; we display tough/avg/soft.
@@ -992,19 +1048,19 @@ function renderGameShell(g) {
 
   div.innerHTML = `
     <div class="game-head">
-      <div class="matchup">${teamName(away)} <span class="at">@</span> ${teamName(home)}</div>
+      <div class="matchup">${teamLogo(away.id, 22)}${teamName(away)} <span class="at">@</span> ${teamLogo(home.id, 22)}${teamName(home)}</div>
       <div class="gtime">${gtime} · ${g.status?.detailedState || ""}</div>
     </div>
     <div class="pitchers-row">
-      <div class="pcard" id="pit-${g.gamePk}-away"><span class="pteam">${teamName(away)} SP</span><br>Loading probable…</div>
-      <div class="pcard" id="pit-${g.gamePk}-home"><span class="pteam">${teamName(home)} SP</span><br>Loading probable…</div>
+      <div class="pcard" id="pit-${g.gamePk}-away"><span class="pteam">${teamLogo(away.id, 15)}${teamName(away)} SP</span><br>Loading probable…</div>
+      <div class="pcard" id="pit-${g.gamePk}-home"><span class="pteam">${teamLogo(home.id, 15)}${teamName(home)} SP</span><br>Loading probable…</div>
     </div>
     <div class="side">
-      <div class="side-label">${teamName(away)} — Top Hitters</div>
+      <div class="side-label">${teamLogo(away.id, 15)}${teamName(away)} — Top Hitters</div>
       <div id="bat-${g.gamePk}-away"><div class="empty-side">loading hitters…</div></div>
     </div>
     <div class="side">
-      <div class="side-label">${teamName(home)} — Top Hitters</div>
+      <div class="side-label">${teamLogo(home.id, 15)}${teamName(home)} — Top Hitters</div>
       <div id="bat-${g.gamePk}-home"><div class="empty-side">loading hitters…</div></div>
     </div>
   `;
@@ -1022,7 +1078,7 @@ async function fillPitcher(gamePk, side, p) {
     el.innerHTML = el.innerHTML.replace("Loading probable…", "<span class='pname'>TBD</span>");
     // record null so hitter tables don't wait forever
     pitcherStore[gamePk] = pitcherStore[gamePk] || {};
-    pitcherStore[gamePk][side] = { kRate: null, name: "TBD" };
+    pitcherStore[gamePk][side] = { kRate: null, baa: null, whip: null, ipPerStart: null, name: "TBD" };
     refreshOpposingHitters(gamePk, side);
     return;
   }
@@ -1032,7 +1088,7 @@ async function fillPitcher(gamePk, side, p) {
     const splits = person.stats?.[0]?.splits?.[0]?.stat || {};
     const era = splits.era, whip = splits.whip, w = splits.wins, l = splits.losses,
           k9 = splits.strikeoutsPer9Inn, so = splits.strikeOuts, ip = splits.inningsPitched,
-          bf = splits.battersFaced;
+          bf = splits.battersFaced, baaStr = splits.avg, gs = splits.gamesStarted;
     const rt = ratePitcher(era, whip);
 
     // Primary: K% = SO / battersFaced. Fallback if battersFaced missing/zero:
@@ -1044,23 +1100,36 @@ async function fillPitcher(gamePk, side, p) {
     }
     const kPct = kRate != null ? (kRate * 100).toFixed(1) + "%" : "–";
 
-    // store for the opposing lineup's strikeout-chance math
-    pitcherStore[gamePk] = pitcherStore[gamePk] || {};
-    pitcherStore[gamePk][side] = { kRate, name: person.fullName };
+    // BAA (opponents' batting average = hits allowed / at-bats faced) and average
+    // innings per start — the two drivers of the opposing hitters' Hit Chance.
+    const baa = baaStr != null ? parseFloat(baaStr) : null;
+    const whipN = whip != null ? parseFloat(whip) : null;
+    let ipPerStart = null;
+    const gsN = parseFloat(gs) || 0;
+    if (gsN >= 1 && ip != null) {
+      ipPerStart = (ipToOuts(ip) / 3) / gsN;   // ipToOuts handles the .1/.2 = thirds notation
+      if (!isFinite(ipPerStart) || ipPerStart <= 0) ipPerStart = null;
+    }
 
+    // store for the opposing lineup's strikeout-chance and hit-chance math
+    pitcherStore[gamePk] = pitcherStore[gamePk] || {};
+    pitcherStore[gamePk][side] = { kRate, baa, whip: whipN, ipPerStart, name: person.fullName };
+
+    const ipStartStr = ipPerStart != null ? ("~" + ipPerStart.toFixed(1) + " IP/st") : "IP/st –";
     const teamLabel = el.querySelector(".pteam")?.outerHTML || "";
     el.innerHTML = `${teamLabel}
       <span class="rating-pill ${rt.cls}">${rt.label}</span><br>
       <span class="pname">${person.fullName}</span>
       <span class="pstat">(${w ?? "–"}-${l ?? "–"})</span><br>
-      <span class="pstat">ERA <span>${era ?? "–"}</span> · WHIP <span>${whip ?? "–"}</span> · K/9 <span>${k9 ?? "–"}</span> · K% <span>${kPct}</span></span>`;
+      <span class="pstat">ERA <span>${era ?? "–"}</span> · WHIP <span>${whip ?? "–"}</span> · K/9 <span>${k9 ?? "–"}</span> · K% <span>${kPct}</span></span><br>
+      <span class="pstat">BAA <span>${baaStr ?? "–"}</span> · <span title="Average innings per start — how deep he usually goes">${ipStartStr}</span></span>`;
 
-    // now that this pitcher's K% is known, (re)render the hitters on the other side
+    // now that this pitcher's stats are known, (re)render the hitters on the other side
     refreshOpposingHitters(gamePk, side);
   } catch (e) {
     el.innerHTML = el.innerHTML.replace("Loading probable…", `<span class='pname'>${p.fullName||"?"}</span> <span class='pstat'>(stats unavailable)</span>`);
     pitcherStore[gamePk] = pitcherStore[gamePk] || {};
-    pitcherStore[gamePk][side] = { kRate: null, name: p.fullName || "?" };
+    pitcherStore[gamePk][side] = { kRate: null, baa: null, whip: null, ipPerStart: null, name: p.fullName || "?" };
     refreshOpposingHitters(gamePk, side);
   }
 }
@@ -1135,7 +1204,9 @@ async function fillTeamHitters(gamePk, teamId, abbr, side) {
       return sOps * 100 + rAvg * 80 + recentHR * 12 + recentH * 1.5;
     }
     rows.sort((a,b) => score(b) - score(a));
-    const top = rows.slice(0, 6);
+    // Cache the top 10 by base form-score; the render step re-ranks by Hit Chance
+    // vs the actual opposing starter and displays the best 6 of this pool.
+    const top = rows.slice(0, 10);
 
     hitterRowCache[`${gamePk}-${side}`] = top;
     renderHitterTable(gamePk, side, top);
@@ -1144,48 +1215,78 @@ async function fillTeamHitters(gamePk, teamId, abbr, side) {
   }
 }
 
-// Renders the hitter table. Pulls the OPPOSING pitcher's K-rate from pitcherStore
-// to compute each hitter's strikeout chance for this matchup. Safe to call repeatedly.
+// Renders the hitter table. Pulls the OPPOSING pitcher's stats from pitcherStore to
+// compute each hitter's HIT CHANCE (odds-ratio of batter AVG vs pitcher BAA, across the
+// at-bats the starter's typical outing length gives them) and K Chance. Rows are RANKED
+// by Hit Chance — the hitters most likely to get a hit off this starter come first.
+// Safe to call repeatedly (re-runs when the pitcher's stats arrive).
 function renderHitterTable(gamePk, side, top) {
   const el = document.getElementById(`bat-${gamePk}-${side}`);
   if (!el || !top || !top.length) return;
 
   const oppSide = side === "home" ? "away" : "home";
   const opp = (pitcherStore[gamePk] || {})[oppSide];
-  // oppKRate: a real number if the pitcher loaded, null if loaded-but-no-Kdata,
-  // undefined if the pitcher fetch hasn't resolved yet.
+  // undefined = pitcher fetch hasn't resolved yet; null fields = loaded but no data.
   let oppKRate = opp ? opp.kRate : undefined;
-  let oppName = opp ? opp.name : null;
+  let oppBaa   = opp ? opp.baa : undefined;
+  let oppName  = opp ? opp.name : null;
+  const oppWhip = opp ? opp.whip : null;
+  const oppIpStart = opp ? opp.ipPerStart : null;
 
-  // If there's no probable pitcher (common for games 2+ days out) or the pitcher
-  // had no usable K data, fall back to a LEAGUE-AVERAGE pitcher so K Chance still
-  // shows a meaningful number, clearly labeled as "vs lg-avg".
+  // League-average fallback when no probable pitcher is posted (or no usable data),
+  // clearly marked with * — same convention as before.
   let usingLeagueAvg = false;
-  if (opp !== undefined && (oppKRate === null)) {
-    oppKRate = LEAGUE_K_RATE;
-    usingLeagueAvg = true;
-    if (!oppName || oppName === "TBD") oppName = "lg-avg";
-  }
+  if (opp !== undefined && oppKRate === null) { oppKRate = LEAGUE_K_RATE; usingLeagueAvg = true; }
+  if (opp !== undefined && (oppBaa == null || isNaN(oppBaa))) { oppBaa = LEAGUE_AVG; usingLeagueAvg = true; }
+  if (usingLeagueAvg && (!oppName || oppName === "TBD")) oppName = "lg-avg";
 
-  // header note about who the K-chance is against
-  let kHeaderTip = "Estimated chance of a strikeout per plate appearance vs. the opposing starter";
-  let projTip = "Projected strikeouts this game (per-PA chance × ~4.1 PA)";
+  // Expected ABs each lineup regular gets vs this starter, from how deep he usually goes.
+  const expAb = expectedAbVsStarter(oppIpStart, oppWhip);
+
+  // Compute Hit Chance per row, then RANK by it (desc) when pitcher data is available.
+  const rows = top.map(r => {
+    const bAvg = parseFloat(r.avg);
+    let hitP = null;
+    if (opp !== undefined && !isNaN(bAvg)) {
+      const perAb = matchupHitProb(bAvg, oppBaa);
+      hitP = atLeastOneHit(perAb, expAb);
+    }
+    return { ...r, hitP };
+  });
+  if (opp !== undefined) {
+    rows.sort((a, b) => (b.hitP ?? -1) - (a.hitP ?? -1));
+  }
+  const show = rows.slice(0, 6);
 
   let html = `<table><thead><tr>
-    <th>Hitter</th><th>AVG</th><th class="hide-sm">OPS</th>
-    <th title="Strikeouts this season">SO</th>
-    <th title="Batter strikeout rate: SO ÷ PA">K%</th>
-    <th title="${projTip}">K&nbsp;Chance</th>
+    <th>Hitter</th><th>AVG</th>
+    <th title="Chance of at least one hit vs this starter, over the ~at-bats his typical outing length allows">Hit&nbsp;Chance</th>
+    <th title="Est. strikeout chance per PA vs this starter (projected Ks in parens)">K&nbsp;Chance</th>
+    <th class="hide-sm">OPS</th>
+    <th class="hide-sm" title="Strikeouts this season">SO</th>
+    <th class="hide-sm" title="Batter strikeout rate: SO ÷ PA">K%</th>
     <th class="hide-sm" title="Home runs, last 15 days">HR&nbsp;15d</th>
   </tr></thead><tbody>`;
 
-  for (const r of top) {
+  for (const r of show) {
     const recentAvg = parseFloat(r.rAvg) || 0;
     const hot = (recentAvg >= 0.300 && (r.rAB||0) >= 10) ? '<span class="hot-flag" title="Batting .300+ over last 15 days">HOT</span>' : '';
     const recentHRcell = (r.rHR||0) > 0 ? `<span class="hr-badge">${r.rHR}</span>` : '<span style="color:var(--muted)">0</span>';
     const bK = r.kRate != null ? (r.kRate * 100).toFixed(1) + "%" : "–";
+    const star = usingLeagueAvg ? '<span class="kavg" title="No probable pitcher posted yet — estimate vs league-average pitcher">*</span>' : '';
 
-    // strikeout chance vs this pitcher (or league-average fallback)
+    // Hit Chance cell (probability of ≥1 hit vs the starter)
+    let hitCell;
+    if (opp === undefined) {
+      hitCell = `<span class="kc-na" title="Waiting on opposing pitcher stats">…</span>`;
+    } else if (r.hitP == null) {
+      hitCell = `<span class="kc-na" title="Insufficient data">n/a</span>`;
+    } else {
+      const pct = Math.round(r.hitP * 100);
+      hitCell = `<span class="kchance ${hitChanceClass(r.hitP)}" title="~${pct}% chance of at least one hit vs ${oppName} over ~${expAb.toFixed(1)} AB">${pct}%${star}</span>`;
+    }
+
+    // K Chance cell (unchanged math)
     let kCell;
     if (oppKRate === undefined) {
       kCell = `<span class="kc-na" title="Waiting on opposing pitcher stats">…</span>`;
@@ -1195,26 +1296,26 @@ function renderHitterTable(gamePk, side, top) {
       const p = matchupKProb(r.kRate, oppKRate);
       const proj = (p * EXPECTED_PA_PER_GAME);
       const pct = Math.round(p * 100);
-      const vsLabel = usingLeagueAvg ? "league-average pitcher" : oppName;
-      const star = usingLeagueAvg ? '<span class="kavg" title="No probable pitcher posted yet — estimate vs league-average pitcher">*</span>' : '';
-      kCell = `<span class="kchance ${kChanceClass(p)}" title="~${pct}% per PA · ~${proj.toFixed(1)} K projected vs ${vsLabel}">${pct}% <span class="kproj">(${proj.toFixed(1)})</span>${star}</span>`;
+      kCell = `<span class="kchance ${kChanceClass(p)}" title="~${pct}% per PA · ~${proj.toFixed(1)} K projected">${pct}% <span class="kproj">(${proj.toFixed(1)})</span>${star}</span>`;
     }
 
     html += `<tr>
       <td class="pname-cell">${r.name}<span class="pos">${r.pos}</span>${hot}</td>
       <td class="num-strong">${fmt3(r.avg)}</td>
-      <td class="hide-sm">${fmt3(r.ops)}</td>
-      <td>${r.so ?? "–"}</td>
-      <td>${bK}</td>
+      <td>${hitCell}</td>
       <td>${kCell}</td>
+      <td class="hide-sm">${fmt3(r.ops)}</td>
+      <td class="hide-sm">${r.so ?? "–"}</td>
+      <td class="hide-sm">${bK}</td>
       <td class="hide-sm">${recentHRcell}</td>
     </tr>`;
   }
   html += `</tbody></table>`;
   if (usingLeagueAvg) {
-    html += `<div class="kfoot">No probable pitcher posted yet — K Chance (<span class="kavg">*</span>) estimated vs a <b>league-average pitcher</b>. Reload once the starter is announced for a matchup-specific number.</div>`;
+    html += `<div class="kfoot">No probable pitcher posted yet — Hit/K Chance (<span class="kavg">*</span>) estimated vs a <b>league-average pitcher</b> (~${LEAGUE_IP_PER_START} IP/start). Reload once the starter is announced.</div>`;
   } else if (oppName) {
-    html += `<div class="kfoot">K Chance vs. opposing starter <b>${oppName}</b> · % = per plate appearance, (n) = projected Ks this game</div>`;
+    const ipNote = oppIpStart != null ? ` · he averages ~${oppIpStart.toFixed(1)} IP/start (~${expAb.toFixed(1)} AB per hitter)` : "";
+    html += `<div class="kfoot">Ranked by <b>Hit Chance</b> vs. starter <b>${oppName}</b>${ipNote} · K Chance: % per PA, (n) = projected Ks</div>`;
   }
   el.innerHTML = html;
 }
@@ -1255,6 +1356,7 @@ async function loadLeaders() {
       return {
         name: player.fullName || "—",
         team: team.abbreviation || team.teamName || "",
+        teamId: team.id,
         avg: st.avg, obp: st.obp, slg: st.slg, ops: st.ops,
         hits: st.hits, doubles: st.doubles, triples: st.triples,
         homeRuns: st.homeRuns, rbi: st.rbi, runs: st.runs,
@@ -1358,7 +1460,7 @@ function renderLeaders() {
       const smCls = c.sm ? "hide-sm" : "";
       let cell;
       if (c.key === "name")      cell = `<span class="pname-cell">${r.name}</span>`;
-      else if (c.key === "team") cell = `<span style="color:var(--accent-2)">${r.team}</span>`;
+      else if (c.key === "team") cell = `<span style="color:var(--accent-2)">${teamLogo(r.teamId, 16)}${r.team}</span>`;
       else if (c.key === "homeRuns") cell = hrCell;
       else if (c.key === "kRate")    cell = bK;
       else if (c.type === "rate")    cell = fmt3(r[c.key]);
@@ -1454,7 +1556,7 @@ async function loadPicks(dateStr) {
           const cHR = careerStat.homeRuns || 0;
           const cAvg = careerStat.avg != null ? parseFloat(careerStat.avg) : (cAB > 0 ? cHits / cAB : 0);
           rows.push({
-            name: person.fullName, team: teamMap[tid], pos: r.position?.abbreviation || "",
+            name: person.fullName, team: teamMap[tid], teamId: tid, pos: r.position?.abbreviation || "",
             cAB, cHits, cHR, cAvg, hrRate: cAB > 0 ? cHR / cAB : 0,
             sznAvg: seasonStat && seasonStat.avg != null ? seasonStat.avg : null
           });
@@ -1515,7 +1617,7 @@ function renderPicks() {
     html += `<tr>
       <td class="rank-num">${medal}</td>
       <td class="pname-cell">${r.name}<span class="pos">${r.pos}</span></td>
-      <td style="color:var(--accent-2)">${r.team}</td>
+      <td style="color:var(--accent-2)" class="teamcell">${teamLogo(r.teamId, 16)}${r.team}</td>
       <td class="hide-sm">${r.cAB.toLocaleString()}</td>
       <td>${r.cHits.toLocaleString()}</td>
       <td class="${type==='power'?'num-strong':''}">${r.cHR}</td>
@@ -1573,8 +1675,8 @@ async function loadTargets(dateStr, win) {
     const oppTeamIds = new Set();
     for (const g of dates[0].games) {
       const home = g.teams.home, away = g.teams.away;
-      if (away.probablePitcher) { pairs.push({ pid: away.probablePitcher.id, pname: away.probablePitcher.fullName, pTeam: away.team.abbreviation || away.team.name, oppId: home.team.id, oppName: home.team.abbreviation || home.team.name }); oppTeamIds.add(home.team.id); }
-      if (home.probablePitcher) { pairs.push({ pid: home.probablePitcher.id, pname: home.probablePitcher.fullName, pTeam: home.team.abbreviation || home.team.name, oppId: away.team.id, oppName: away.team.abbreviation || away.team.name }); oppTeamIds.add(away.team.id); }
+      if (away.probablePitcher) { pairs.push({ pid: away.probablePitcher.id, pname: away.probablePitcher.fullName, pTeam: away.team.abbreviation || away.team.name, pTeamId: away.team.id, oppId: home.team.id, oppName: home.team.abbreviation || home.team.name }); oppTeamIds.add(home.team.id); }
+      if (home.probablePitcher) { pairs.push({ pid: home.probablePitcher.id, pname: home.probablePitcher.fullName, pTeam: home.team.abbreviation || home.team.name, pTeamId: home.team.id, oppId: away.team.id, oppName: away.team.abbreviation || away.team.name }); oppTeamIds.add(away.team.id); }
     }
     if (!pairs.length) {
       el.innerHTML = '<div class="status-msg">No probable starting pitchers are posted yet for <strong>' + dateStr + '</strong>. Starters are usually announced a day or two out — try again closer to game day.</div>';
@@ -1664,9 +1766,9 @@ function renderTargets() {
     }
     html += `<div class="target-card">
       <div class="target-head">
-        <span class="target-pitcher">${r.pname}</span>
+        <span class="target-pitcher">${teamLogo(r.pTeamId, 20)}${r.pname}</span>
         <span class="hit-pill ${hc.cls}">${hc.label} · ${Math.round(r.score)}</span>
-        <span class="target-vs">${r.pTeam} starter · ${r.oppName} bats facing him</span>
+        <span class="target-vs">${r.pTeam} starter · ${teamLogo(r.oppId, 14)}${r.oppName} bats facing him</span>
       </div>
       <div class="target-statline">
         <span>IP <b>${r.ipStr}</b></span>
@@ -1677,7 +1779,7 @@ function renderTargets() {
         <span>ERA <b>${r.era != null ? r.era : "–"}</b></span>
       </div>
       <div class="target-bats">
-        <div class="target-bats-label">🎯 ${r.oppName} bats facing ${r.pname} (top by OPS)</div>
+        <div class="target-bats-label">🎯 ${teamLogo(r.oppId, 14)}${r.oppName} bats facing ${r.pname} (top by OPS)</div>
         ${batsHtml}
       </div>
     </div>`;
@@ -1730,6 +1832,7 @@ async function loadPitchers() {
       return {
         name: player.fullName || "—",
         team: team.abbreviation || team.teamName || "",
+        teamId: team.id,
         wins: st.wins, losses: st.losses,
         era: st.era, whip: st.whip,
         inningsPitched: st.inningsPitched,
@@ -1821,7 +1924,7 @@ function renderPitchers(which) {
       const smCls = c.sm ? "hide-sm" : "";
       let cell;
       if (c.key === "name")        cell = `<span class="pname-cell">${r.name}</span>`;
-      else if (c.key === "team")   cell = `<span style="color:var(--accent-2)">${r.team}</span>`;
+      else if (c.key === "team")   cell = `<span style="color:var(--accent-2)">${teamLogo(r.teamId, 16)}${r.team}</span>`;
       else if (c.key === "wl")     cell = `${r.wins ?? "–"}-${r.losses ?? "–"}`;
       else if (c.key === "kRate")  cell = kPct;
       else if (c.type === "rate")  cell = (r[c.key] != null ? r[c.key] : "–");      // ERA/WHIP as given
@@ -1920,7 +2023,7 @@ async function loadSlateForm(dateStr, gamesN, targetElId) {
         let seasonAvg = null, seasonAB = 0;
         const st = person.stats?.find(s => (s.group?.displayName === "hitting"))?.splits?.[0]?.stat;
         if (st) { seasonAvg = st.avg; seasonAB = st.atBats || 0; }
-        hitters.push({ id: person.id, name: person.fullName, team: teamMap[tid], pos: r.position?.abbreviation || "", seasonAvg, seasonAB });
+        hitters.push({ id: person.id, name: person.fullName, team: teamMap[tid], teamId: tid, pos: r.position?.abbreviation || "", seasonAvg, seasonAB });
       }
     } catch (e) { /* skip team on error */ }
   }
@@ -2044,7 +2147,7 @@ function renderSlumps() {
     for (const r of groupRows) {
       html += `<tr>
         <td class="pname-cell">${r.name}<span class="pos">${r.pos}</span></td>
-        <td style="color:var(--accent-2)">${r.team}</td>
+        <td style="color:var(--accent-2)" class="teamcell">${teamLogo(r.teamId, 16)}${r.team}</td>
         <td>${r.ab}</td>
         <td>${r.hits}</td>
         <td>${r.hr}</td>
@@ -2103,7 +2206,7 @@ function renderHot() {
       const hrCell = (r.hr||0) > 0 ? `<span class="hr-badge">${r.hr}</span>` : '0';
       html += `<tr>
         <td class="pname-cell">${r.name}<span class="pos">${r.pos}</span></td>
-        <td style="color:var(--accent-2)">${r.team}</td>
+        <td style="color:var(--accent-2)" class="teamcell">${teamLogo(r.teamId, 16)}${r.team}</td>
         <td>${r.ab}</td>
         <td>${r.hits}</td>
         <td>${hrCell}</td>
@@ -2176,7 +2279,7 @@ async function loadPitcherSlateForm(dateStr, gamesN, targetElId) {
         let seasonEra = null;
         const st = person.stats?.find(s => (s.group?.displayName === "pitching"))?.splits?.[0]?.stat;
         if (st) seasonEra = st.era;
-        pitchers.push({ id: person.id, name: person.fullName, team: teamMap[tid], seasonEra });
+        pitchers.push({ id: person.id, name: person.fullName, team: teamMap[tid], teamId: tid, seasonEra });
       }
     } catch (e) { /* skip team on error */ }
   }
@@ -2304,7 +2407,7 @@ function renderPitcherForm(which) {
       const hrCell = (r.hr||0) > 0 ? `<span class="hr-badge">${r.hr}</span>` : '0';
       html += `<tr>
         <td class="pname-cell">${r.name}</td>
-        <td style="color:var(--accent-2)">${r.team}</td>
+        <td style="color:var(--accent-2)" class="teamcell">${teamLogo(r.teamId, 16)}${r.team}</td>
         <td>${r.ip}</td>
         <td>${r.h}</td>
         <td class="hide-sm">${r.bb}</td>
